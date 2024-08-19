@@ -20,7 +20,3 @@ def test_reading_ECLab_Files():
     assert file1.start_time == 0, f'Start_time should equal 0 for file_1 but equals {file1.start_time}'
     assert file2.start_time == datetime.datetime.strptime('07/11/2024 10:31:05.3322', "%m/%d/%Y %H:%M:%S.%f"), f'Start_time should equal 07/11/2024 10:31:05.3322 for file_2 but equals {file2.start_time}'
     assert file2.end_time == datetime.datetime.strptime('07/12/2024 13:50:07.7127', "%m/%d/%Y %H:%M:%S.%f"), f'End_time should equal 07/12/2024 13:50:07.7127 for file_2 but equals {file2.end_time}'
-
-
-
-
