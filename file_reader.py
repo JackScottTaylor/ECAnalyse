@@ -97,6 +97,49 @@ class Data:
         new_data.end_time = self.convert_elapsed_time_to_datetime(new_data.t[-1])
 
         return new_data
+    
+    def in_data_range(self, data_name, start, end):
+        # This function returns a new data object containing only the data stored in the range
+        # defined by start <= x <= end for the provided data_name.
+        # Data_name can be and data_name stored in self.data or can be common attribute.
+
+        # If data_name is not in self.data_names, then check if it is an attribute.
+        # If not then raise an error.
+        if data_name not in self.data_names:
+            if not hasattr(self, data_name):
+                raise ValueError(
+                    f'{data_name} is not a data_name or common attribute of the Data object.'
+                )
+            else:
+                # If data_name is attribute then check that attribute is a numpy array.
+                # If not then raise an error.
+                if type(getattr(self, data_name)) != np.ndarray:
+                    raise ValueError(
+                        f'{data_name} attribute is not an array.'
+                    )
+                else:                                                               
+                    data = getattr(self, data_name)
+        # If data_name is in self.data_names, then set data to the data stored in self.data.
+        else:
+            data = self.data[data_name]
+
+
+        # Create a new blank object of the same type as self.
+        new_data = type(self)()
+        new_data.data_names = self.data_names
+        data_mask = (data >= start) & (data <= end)
+        for data_name in self.data_names: new_data.data[data_name] = self.data[data_name][data_mask]
+
+        # Set the common attributes of the new_data object.
+        new_data.set_commonly_accessed_attributes()
+
+        # Calculate the new start and end times if object has t attribute.
+        if hasattr(new_data, 't'):
+            new_data.start_time = self.convert_elapsed_time_to_datetime(new_data.t[0])
+            new_data.end_time = self.convert_elapsed_time_to_datetime(new_data.t[-1])
+
+        return new_data
+
 
 class ECLab_File(Data):
     def __init__(self, *file_name):

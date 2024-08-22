@@ -5,7 +5,7 @@ import numpy as np
 repository_path = pathlib.Path(__file__).parent.resolve()
 data_files_dir = os.path.join(repository_path, 'data_files')
 
-from ..file_reader import ECLab_File
+from ..file_reader import Data, ECLab_File
 
 def test_reading_ECLab_Files():
     # This test ensures that ECLab_File can correctly extract data from an ECLab file.
@@ -46,4 +46,34 @@ def test_in_time_range():
     new     = file2.in_time_range(start, end)
     assert new.start_time == datetime.datetime.strptime('07/11/2024 10:31:10.3322', "%m/%d/%Y %H:%M:%S.%f"), f'Start_time should equal 07/11/2024 10:31:10.3322 for file_2 but equals {new.start_time}'
     assert new.end_time == datetime.datetime.strptime('07/12/2024 13:50:02.6775', "%m/%d/%Y %H:%M:%S.%f"), f'End_time should equal 07/12/2024 13:50:03.6775 for file_2 but equals {new.end_time}'
+
+
+def test_in_data_range():
+    # This test ensures that the in_data_range function works correctly.
+    data_file = Data()
+    data_file.data['time/s']    = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+    data_file.data['other']     = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
+    data_file.data_names        = ['time/s', 'other']
+    data_file.set_attributes(['time/s', 'other'], ['t', 'o'])
+
+    # Test 1: Test that can extract data within specified range.
+    test1 = data_file.in_data_range('time/s', 3, 7)
+    assert np.array_equal(test1.data['time/s'], np.array([3, 4, 5, 6, 7])), f'Time data is not correct for test 1.'
+    assert np.array_equal(test1.data['other'], np.array([30, 40, 50, 60, 70])), f'Other data is not correct for test 1.'
+
+    # Test 2: Test that can extract using attribute.
+    test2 = data_file.in_data_range('t', 3, 7)
+    assert np.array_equal(test2.data['time/s'], np.array([3, 4, 5, 6, 7])), f'Time data is not correct for test 2.'
+    assert np.array_equal(test2.data['other'], np.array([30, 40, 50, 60, 70])), f'Other data is not correct for test 2.'
+
+    # Test 3: Test that if range is outside of data, then all data returned
+    test3 = data_file.in_data_range('t', 0, 11)
+    assert np.array_equal(test3.data['time/s'], np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])), f'Time data is not correct for test 3.'
+    assert np.array_equal(test3.data['other'], np.array([10, 20, 30, 40, 50, 60, 70, 80, 90, 100])), f'Other data is not correct for test 3.'
+
+    # Test 4: Test that if provided attribute is not an array, then an error is raised.
+    try:
+        data_file.in_data_range('xxx', 3, 7)
+    except ValueError as e:
+        assert 'is not a data_name or common attribute of the Data object.' in str(e), 'Error message is not correct for test 4.'
 
