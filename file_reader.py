@@ -98,6 +98,38 @@ class Data:
 
         return new_data
     
+    def in_time_range(self, start, end):
+        # This function is very similar to in_data_range, but just for time data. Time is slightly
+        # more complicated as you may want to describe time range in absolute time whereas the time
+        # data is always stored as elapsed time.
+        
+        # First check that the object has time data, this should always be stored as an attribute
+        # stored as self.t.
+        if not hasattr(self, 't'):
+            raise ValueError(
+                f'{type(self)} object does not contain time data. Cannot determine time range.'
+            )
+        
+        # If start or end is a datetime object, then convert to elapsed time.
+        # convert_datetime_to_elapsed_time raises an error if start_time is not defined.
+        if type(start) == datetime.datetime: start = self.convert_datetime_to_elapsed_time(start)
+        if type(end) == datetime.datetime: end = self.convert_datetime_to_elapsed_time(end)
+
+        # Now check that start and end are both either floats or ints, as they should now correspond
+        # to elapsed time. If not then raise an error.
+        if type(start) != float and type(start) != int:
+            raise ValueError(
+                'Start of time range must be either a float or an integer'
+            )
+        if type(end) != float and type(end) != int:
+            raise ValueError(
+                'End of time range must be either a float or an integer'
+            )
+        
+        # Now use in_data_range method to extract data within the time range.
+        return self.in_data_range('t', start, end)
+    
+    
     def in_data_range(self, data_name, start, end):
         # This function returns a new data object containing only the data stored in the range
         # defined by start <= x <= end for the provided data_name.
