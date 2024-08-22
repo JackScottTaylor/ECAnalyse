@@ -77,3 +77,21 @@ def test_in_data_range():
     except ValueError as e:
         assert 'is not a data_name or common attribute of the Data object.' in str(e), 'Error message is not correct for test 4.'
 
+
+def test_ECLab_File_cycles():
+    # This test ensures that the cycles function works correctly.
+    file1 = 'data_files/PAQ (5mM) TBAPF6 (0,1M) DMSO, N2 100 CO2 0, 100mVs-1, -1,86V-1V_C01.txt'
+    file1 = ECLab_File(os.path.join(repository_path, file1))
+
+    file1_cycles_1_2 = file1.cycles(1, 2)
+    assert len(file1_cycles_1_2.E) == 11417, f'Length of E is not correct for cycles 1-2.'
+
+    file1_out_of_range_cycles = file1.cycles(200)
+    assert len(file1_out_of_range_cycles.E) == 0, f'Length of E is not correct for out of range cycles.'
+
+    file2 = 'data_files/ACC-20, 1M Na2SO4, N2 10mlmin-1, CO2 2,5mlmin-1, 2,5rpm_C01.txt'
+    file2 = ECLab_File(os.path.join(repository_path, file2))
+
+    file2_cycles_1_2 = file2.cycles(1, 2)
+    correct_end_time = datetime.datetime.strptime('07/11/2024 15:41:35.6007', "%m/%d/%Y %H:%M:%S.%f")
+    assert file2_cycles_1_2.end_time == correct_end_time, f'End time should be {correct_end_time} for cycles 1-2 but is {file2_cycles_1_2.end_time}.'
