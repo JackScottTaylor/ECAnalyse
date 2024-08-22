@@ -51,52 +51,6 @@ class Data:
             []
         )
 
-    def in_time_range(self, start, end):
-        # This function returns a new Data object containing only the data stored in the
-        # provided time range.
-
-        if not hasattr(self, 't'):
-            raise ValueError(
-                'Data object does not contain time data. Cannot define time interval.'
-            )
-
-        # If start or end is datetime, but Data object contains no absolute start_time,
-        # then raise an error message.
-        if self.start_time == 0:
-            if type(start) == datetime.datetime or type(end) == datetime.datetime:
-                raise ValueError(
-                    'Absolute start_time not defined for data object. Cannot define time interval' + 
-                    ' using absolute times.'
-                )
-        
-        # Convert start and end to times elapsed since start of experiment
-        if type(start) == datetime.datetime: elapsed_start = self.convert_datetime_to_elapsed_time(start)
-        if type(end) == datetime.datetime: elapsed_end = self.convert_datetime_to_elapsed_time(end)
-
-        # If start or end is a float or int, then convert to datetime object.
-        if type(start) == float or type(start) == int:
-            absolute_start = self.convert_elapsed_time_to_datetime(start)
-        if type(end) == float or type(end) == int:
-            absolute_end = self.convert_elapsed_time_to_datetime(end)
-
-        # Create a new blank object of the same type as self. Therefore if self is for example
-        # an ECLab_File object, then the new_data object will also be an ECLab_File object.
-        # This is so that functions which sort data files based on their type can still be used.
-        new_data = type(self)()
-        new_data.data_names = self.data_names
-        time_mask = (self.t >= elapsed_start) & (self.t <= elapsed_end)
-        for data_name in self.data_names:
-            new_data.data[data_name] = self.data[data_name][time_mask]
-
-        # Set the common attributes of the new_data object.
-        new_data.set_commonly_accessed_attributes()
-
-        # Calculate the new start and end times. Remembering that start may not be the actual 
-        # start_time of the new_data object.
-        new_data.start_time = self.convert_elapsed_time_to_datetime(new_data.t[0])
-        new_data.end_time = self.convert_elapsed_time_to_datetime(new_data.t[-1])
-
-        return new_data
     
     def in_time_range(self, start, end):
         # This function is very similar to in_data_range, but just for time data. Time is slightly
@@ -216,6 +170,3 @@ class ECLab_File(Data):
 
         # Finally set the end_time, assuming that 'time/s' has been recorded.
         if 'time/s' in self.data_names: self.end_time = self.convert_elapsed_time_to_datetime(self.data['time/s'][-1])
-
-
-
