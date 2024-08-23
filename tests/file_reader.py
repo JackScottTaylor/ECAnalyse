@@ -5,7 +5,8 @@ import numpy as np
 repository_path = pathlib.Path(__file__).parent.resolve()
 data_files_dir = os.path.join(repository_path, 'data_files')
 
-from ..file_reader import Data, ECLab_File
+from ..Data import Data
+from ..File_Types import ECLab_File
 
 def test_reading_ECLab_Files():
     # This test ensures that ECLab_File can correctly extract data from an ECLab file.
