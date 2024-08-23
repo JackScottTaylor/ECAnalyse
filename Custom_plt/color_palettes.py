@@ -41,7 +41,7 @@ IBM = [
 
 # Found at 'https://stackoverflow.com/questions/65013406/how-to-generate-30-distinct-colors-that-are-color-blind-friendly'
 # A fourth color-blind friendly palette that contains a lot more distinct colours.
-color_blind_extended = [
+cb4 = [
     "#000000",
     "#004949",
     "#009292",
