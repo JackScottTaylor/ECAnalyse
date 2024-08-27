@@ -98,3 +98,5 @@ def test_ECLab_File_cycles():
     file2_cycles_1_2 = file2.cycles(1, 2)
     correct_end_time = datetime.datetime.strptime('07/11/2024 15:41:35.6007', "%m/%d/%Y %H:%M:%S.%f")
     assert file2_cycles_1_2.end_time == correct_end_time, f'End time should be {correct_end_time} for cycles 1-2 but is {file2_cycles_1_2.end_time}.'
+
+# Testing pull requests
