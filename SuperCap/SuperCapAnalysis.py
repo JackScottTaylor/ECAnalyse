@@ -1,0 +1,1 @@
+# This module contains all of the fuctions which analyse data for supercapacitor experiments.
