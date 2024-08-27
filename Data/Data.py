@@ -11,6 +11,7 @@ class Data:
         self.t_data_name = ''
         self.start_time, self.end_time = 0, 0
         self.data_type = 'Data'
+        self.plot_params = {} # Dictionary used for storing plot parameters.
 
 
     def __add__(self, other):
