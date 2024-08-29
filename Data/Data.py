@@ -85,6 +85,21 @@ class Data:
         return (time - self.start_time).total_seconds()
     
 
+    def elapsed_time(self, start_time):
+        # This function converts the time data in self.t to elapsed time since the 
+        # provided start_time.
+        if type(start_time) != type(self.start_time):
+            raise ValueError(
+                'start_time must be the same type as self.start_time.'
+            )
+        if type(start_time) == datetime.datetime:
+            time_diff = (self.start_time - start_time).total_seconds()
+            return self.t + time_diff
+        # If not datetime object then self.start_time should equal 0.
+        else:
+            return self.t - start_time
+
+
     def convert_elapsed_time_to_datetime(self, time):
         # This function takes an elapsed time in seconds and, using self.start_time,
         # converts this to an absolute time.
@@ -142,7 +157,7 @@ class Data:
         return self.in_data_range('t', start, end)
     
     
-    def in_data_range(self, data_name, start, end):
+    def in_data_range(self, data_name, start, end, closed_start=True, closed_end=True):
         # This function returns a new data object containing only the data stored in the range
         # defined by start <= x <= end for the provided data_name.
         # Data_name can be and data_name stored in self.data or can be common attribute.
@@ -171,12 +186,15 @@ class Data:
         # Create a new blank object of the same type as self.
         new_data = type(self)()
         new_data.data_names = self.data_names
-        data_mask = (data >= start) & (data <= end)
+        if closed_start and closed_end: data_mask = (data >= start) & (data <= end)
+        elif closed_start and not closed_end: data_mask = (data >= start) & (data < end)
+        elif not closed_start and closed_end: data_mask = (data > start) & (data <= end)
+        else: data_mask = (data > start) & (data < end)
         for data_name in self.data_names: new_data.data[data_name] = self.data[data_name][data_mask]
 
         # If the data contains time_data, then need to set start and end times and convert the 
         # elapsed time_data to elapsed time since start of new_data.
-        if new_data.t_data_name in new_data.data_names:
+        if new_data.t_data_name in new_data.data_names and new_data.data[new_data.t_data_name].size > 0:
             new_data.start_time = self.convert_elapsed_time_to_datetime(new_data.data[new_data.t_data_name][0])
             new_data.end_time   = self.convert_elapsed_time_to_datetime(new_data.data[new_data.t_data_name][-1])
             new_data.data[new_data.t_data_name] -= new_data.data[new_data.t_data_name][0]
@@ -185,3 +203,12 @@ class Data:
         new_data.set_commonly_accessed_attributes()
 
         return new_data
+    
+    def check_has_attributes(self, *attributes):
+        # This function checks that the object has all the provided attributes.
+        # If not then an error is raised.
+        for attribute in attributes:
+            if not hasattr(self, attribute):
+                raise ValueError(
+                    f'{type(self)} object does not have {attribute} attribute.'
+                )
