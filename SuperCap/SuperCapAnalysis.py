@@ -13,7 +13,7 @@ def charging_data(file):
     # Charging is defined as when the current is positive.
     file.check_has_attributes('I')
     charging = file.in_data_range('I', 0, np.inf, closed_start=False)
-    if len(charging.I) == 0: charging.start_time = file.start
+    if len(charging.I) == 0: charging.start_time = file.start_time
     return charging
 
 def discharging_data(file):
