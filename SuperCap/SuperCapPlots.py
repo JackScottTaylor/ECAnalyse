@@ -151,29 +151,6 @@ def plot_GCD_Coulomb_efficiencies(*files, labels=[], use_params=False, ax=plt.gc
     ax.set_ylabel('Coulombic Efficiency / %')
 
 
-def plot_GCD_energy_efficiencies(*files, labels=[], use_params=False, ax=plt.gca()):
-    # This function plots the energy efficiencies of each cycle in the file.
-    labels = full_labels_list(files, labels)
-    params = gen_params_list(files, use_params)
-    check_start_times_same_type(files)
-
-    def plot_efficiency_vs_cycle_number(file, label, params):
-        efficiencies = []
-        for cycle in np.unique(file.c):
-            cycle_file = file.cycle(cycle)
-            efficiency = energy_efficiency_of_single_cycle(cycle_file)
-            efficiencies.append(efficiency)
-        ax.plot(np.unique(file.c), efficiencies, label=label, **params)
-
-    apply_plot_func_to_all_files(
-        plot_efficiency_vs_cycle_number, files, labels, params,
-        required_attributes = ['I', 't']
-    )
-
-    ax.set_xlabel('Cycle Number')
-    ax.set_ylabel('Energy Efficiency / %')
-
-
 
 
 
