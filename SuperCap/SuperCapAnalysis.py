@@ -35,3 +35,31 @@ def convert_C_to_mAh(charge):
     # This function converts charge in Coulombs to charge in mAh.
     # 1 C = 3600 mAh
     return charge * 1000 / 3600
+
+def capacitance_using_voltage_difference(file):
+    # This function calculates the capacitance at each time point
+    # using C = Q/V where Q is the charge passed and in this case
+    # V is the difference in voltage since the start of the experiment.
+    file.check_has_attributes('I', 't', 'E')
+    charge, voltage = np.array([]), np.array([])
+    if file.I.size > 0:
+        charge = cumulative_charge(file)
+        voltage = file.E - file.E[0]
+    return charge / voltage
+
+def coulomb_efficiency_of_single_cycle(file):
+    # The provided file should contain only a single cycle.
+    # Coulomb efficiency defined as total charge passed during 
+    # negative current divided by total charge passed during positive current.
+    # Returns value as a percentage.
+    file.check_has_attributes('I', 't')
+    charging, discharging       = charging_data(file), discharging_data(file)
+    charge_passed_charging      = 0
+    charge_passed_discharging   = 0
+    if charging.I.size > 0:
+        charge_passed_charging = cumulative_charge(charging)[-1]
+    if discharging.I.size > 0:
+        charge_passed_discharging   = cumulative_charge(discharging)[-1]
+    if charge_passed_discharging == 0: return 0
+    return abs(100 * charge_passed_discharging / charge_passed_charging)
+
