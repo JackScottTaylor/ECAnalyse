@@ -116,7 +116,10 @@ def doc_string(python_file_contents, i):
     docstring = ''
     for line in python_file_contents[i + 1:]:
         if line.strip() == "'''": break
-        docstring += line.strip() + '\n\n'
+        if line.strip().endswith('\\'):
+            docstring += line.strip().replace('\\', '')
+        else:
+            docstring += line.strip() + '\n\n'
 
     docstring += '\n'
     return docstring
@@ -134,7 +137,7 @@ def add_bold_to_sections(doc):
     '''
 
     for section in [
-        'Arguments:', 'Returns:', 'Methodology:', 'Examples:'
+        'Arguments:', 'Returns:', 'Methodology:', 'Examples:', 'Parent Class:', 'Description:'
     ]:
         doc = doc.replace(section, f'**{section}**')
     return doc
