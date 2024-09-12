@@ -12,6 +12,7 @@ class Data:
         self.start_time, self.end_time = 0, 0
         self.data_type = 'Data'
         self.plot_params = {} # Dictionary used for storing plot parameters.
+        self.t_data_name = '' # If the data contains time data, set this to the correct data_name.
 
 
     def __add__(self, other):
