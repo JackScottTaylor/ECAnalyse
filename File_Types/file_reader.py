@@ -1,12 +1,32 @@
-# This library is used for extracting data from various filetypes.
-# There is a generic Data object which is used to store the data.
+'''
+This module contains child classes of the Data class which are used to read specific file types.
+The Data class is a generic data object which is used to store data from different file types.
+'''
 
 import numpy as np
 import datetime
 from ..Data import Data
 
 class ECLab_File(Data):
+    '''
+    Description:
+    This class is used to read data from an ECLab txt file.
+
+    Parent Class:
+    Data
+    '''
     def __init__(self, *file_name):
+        '''
+        Arguments:
+        - *file_name: str (optional)
+            The path of the file to be read
+
+        Methodology:
+        - self.data_type is set to 'ECLab_File'.
+        - Data is extracted from the file, stored in self.data, and the data_names are stored in self.data_names.
+        - The start and end times are set.
+        - The commonly accessed attributes are set.
+        '''
         Data.__init__(self)
         self.time_format = "%m/%d/%Y %H:%M:%S.%f"
         self.data_type = 'ECLab_File'
@@ -16,12 +36,34 @@ class ECLab_File(Data):
         self.set_commonly_accessed_attributes()
 
     def set_commonly_accessed_attributes(self):
+        '''
+        Description:
+        INTERNAL FUNCTION CALLED DURING INITIALIZATION.
+        For an ECLab file, the commonly accessed attributes are time/s, Ewe/V, I/mA and cycle number.
+        The data for these is stored in the attributes t, E, I and c respectively.
+        '''
         self.set_attributes(
             ['time/s',  'Ewe/V',    'I/mA', 'cycle number'],
             ['t',       'E',        'I',    'c']
         )
 
     def extract_data(self, file_name):
+        '''
+        Description:
+        INTERNAL FUNCTION CALLED DURING INITIALIZATION.
+        This function handles reading the data from the text file, handling the time data, and storing \
+        everything in the self.data dictionary.
+        
+        Arguments:
+        - file_name: str
+            The path of the ECLab txt file to be read.
+
+        Methodology:
+        - The data is extracted from the file
+        - The data_names are stored in self.data_names
+        - Time is converted to elapsed time and the start and end times are set.
+        - All data stored as numpy arrays in self.data
+        '''
         # The first line contains some mus and therefore is encoded with latin1
         # instead of the usual UTF-8
         with open(file_name, encoding='latin1') as file:
@@ -52,14 +94,29 @@ class ECLab_File(Data):
 
     
     def cycle(self, c):
-        # This function returns a new ECLab_File object containing only the data from the specified cycle.
+        '''
+        Arguments:
+        - c: int or float
+            The cycle number to be extracted.
+
+        Returns:
+        - ECLab_File object
+            The ECLab_File object containing only the data from the specified cycle.
+        '''
         c = float(c)
         return self.in_data_range('c', c, c)
 
 
     def cycles(self, *cycles):
-        # This function returns a new ECLab_File object containing only the data from the specified cycles.
-        # If no cycles are specified then an error is raised
+        ''' 
+        Arguments:
+        - *cycles: int or float
+            The cycle numbers to be extracted.
+
+        Returns:
+        - ECLab_File object
+            The ECLab_File object containing only the data from the specified cycles.
+        '''
         cycles_list = list(cycles)
         if not cycles_list:
             raise ValueError(
