@@ -137,7 +137,7 @@ def add_bold_to_sections(doc):
     '''
 
     for section in [
-        'Arguments:', 'Returns:', 'Methodology:', 'Examples:', 'Parent Class:', 'Description:'
+        'Arguments:', 'Returns:', 'Methodology:', 'Examples:', 'Parent Class:', 'Description:', 'Note:'
     ]:
         doc = doc.replace(section, f'**{section}**')
     return doc

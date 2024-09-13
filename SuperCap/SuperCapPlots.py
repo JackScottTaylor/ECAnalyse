@@ -1,4 +1,9 @@
-# This module contains the functions used for making plots for SuperCap experiments.
+'''
+This module contains the functions for generating plots from supercapacitor experiments.
+Data is most often analysed using the functions in SuperCapAnalysis
+'''
+
+
 from ..custom_plt import custom_plt
 from ..plotting_funcs import full_labels_list, check_start_times_same_type, gen_params_list
 from ..plotting_funcs import apply_plot_func_to_all_cycles_in_all_files
@@ -7,10 +12,40 @@ from .SuperCapAnalysis import charging_data, discharging_data, cumulative_charge
 from .SuperCapAnalysis import capacitance_using_voltage_difference
 import numpy as np
 import itertools
-
 plt = custom_plt()
 
+
 def plot_GCD(*files, labels=[], use_params=False, ax=plt.gca()):
+    '''
+    Description:
+    This function plots the voltage against time, which is the standard plot for GCD experiments.
+    X and Y axes are labelled correctly.
+
+    Arguments:
+    - *files: Data (usually ECLab_File)
+        The data files to be plotted.
+    - labels = []: list
+        The labels to be used for the legend. Default is empty list which means no \
+        entries added to legend.
+    - use_params = False: bool
+        If True, then the style each file is plotted with is determined by \
+        the file's plot_params attribute. Default is to use the default plot style.
+    - ax = plt.gca(): matplotlib.pyplot.Axes
+        The axes object to plot the data on. Default is the current axis.
+
+    Examples:
+    ```python
+    GCD = ECLab_File('/Users/jack/Documents/GitHub/ECAnalyse/tests/data_files/ACC-20, 1M Na2SO4, N2 10mlmin-1, CO2 2,5mlmin-1, 2,5rpm_C01.txt')
+    GCD_0123 = GCD.cycles(0,1,2,3)
+    GCD_6789 = GCD.cycles(6,7,8,9)
+    GCD_111213   = GCD.cycles(11,12,13)
+    plot_GCD(GCD_0123, GCD_6789, GCD_111213, labels=['0,1,2,3', '6,7,8,9', '11,12,13'])
+    plt.title('Example of a GCD plot')
+    plt.legend()
+    plt.show()
+    ```
+    ![Example of plot_GCD figure](/SuperCap/ReadMeImages/plot_GCD.pdf)
+    '''
     # In GCD experiments, constant current is applied.
     # Voltage is plotted against time.
 
@@ -23,6 +58,9 @@ def plot_GCD(*files, labels=[], use_params=False, ax=plt.gca()):
     start_time = files[0].start_time
 
     def plot_one_file(file, label, params):
+        '''
+    
+        '''
         ax.plot(file.elapsed_time(start_time), file.E, label=label, **params)
 
     # Apply plotting function to all files in the standard way.
@@ -36,6 +74,9 @@ def plot_GCD(*files, labels=[], use_params=False, ax=plt.gca()):
         
         
 def plot_GCD_E_vs_Q(*files, labels=[], use_params=False, charge_unit='C', ax=plt.gca()):
+    '''
+    
+    '''
     # In GCD experiments, constant current is applied.
     # voltage is plotted against charge.
     labels = full_labels_list(files, labels)
@@ -43,6 +84,9 @@ def plot_GCD_E_vs_Q(*files, labels=[], use_params=False, charge_unit='C', ax=plt
     params_list = gen_params_list(files, use_params)
 
     def plot_one_cycle(file, label, params):
+        '''
+    
+        '''
         # Extract the charging and discharging data
         charging, discharging = charging_data(file), discharging_data(file)
         # Calculate the cumulative charge in Coulombs.
@@ -72,12 +116,18 @@ def plot_GCD_E_vs_Q(*files, labels=[], use_params=False, charge_unit='C', ax=plt
 
 
 def plot_GCD_C_vs_E(*files, labels=[], use_params=False, ax=plt.gca()):
+    '''
+    
+    '''
     # The Capacitance C=Q/V is plotted against voltage.
     labels = full_labels_list(files, labels)
     check_start_times_same_type(files)
     params_list = gen_params_list(files, use_params)
 
     def make_plot(file, label, params):
+        '''
+    
+        '''
         # First extract the charging and discharging data.
         charging, discharging = charging_data(file), discharging_data(file)
         # Calculate the capacitance using the voltage difference.
@@ -97,6 +147,9 @@ def plot_GCD_C_vs_E(*files, labels=[], use_params=False, ax=plt.gca()):
 
 
 def plot_GCD_specific_C_vs_E(mass1, *files, mass2=None, labels=[], use_params=False, ax=plt.gca()):
+    '''
+    
+    '''
     # Similar to plot_GCD_C_vs_E but uses specific capacitance instead.
     # If only one mass provided then the same mass is used for both.
     if mass2 == None: mass2 = mass1
@@ -107,6 +160,9 @@ def plot_GCD_specific_C_vs_E(mass1, *files, mass2=None, labels=[], use_params=Fa
     check_start_times_same_type(files)
 
     def make_plot(file, label, params):
+        '''
+    
+        '''
         # First extract the charging and discharging data.
         charging, discharging = charging_data(file), discharging_data(file)
         # Calculate the capacitance using the voltage difference.
@@ -129,12 +185,18 @@ def plot_GCD_specific_C_vs_E(mass1, *files, mass2=None, labels=[], use_params=Fa
 
 
 def plot_GCD_Coulomb_efficiencies(*files, labels=[], use_params=False, ax=plt.gca()):
+    '''
+    
+    '''
     # This function plots the coulomb efficiencies of each cycle in the file.
     labels = full_labels_list(files, labels)
     params = gen_params_list(files, use_params)
     check_start_times_same_type(files)
 
     def plot_efficiency_vs_cycle_number(file, label, params):
+        '''
+    
+        '''
         efficiencies = []
         for cycle in np.unique(file.c):
             cycle_file = file.cycle(cycle)
