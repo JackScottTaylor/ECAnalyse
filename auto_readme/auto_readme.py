@@ -39,6 +39,7 @@ def auto_readme(python_file_path):
             md_text += section_title(line)
             doc = doc_string(python_file_contents, i)
             doc = add_bold_to_sections(doc)
+            doc = remove_over_linebreaks_python(doc)
             md_text += doc
 
     # Create a table of contents at the start of the readme file
@@ -140,4 +141,28 @@ def add_bold_to_sections(doc):
         'Arguments:', 'Returns:', 'Methodology:', 'Examples:', 'Parent Class:', 'Description:', 'Note:'
     ]:
         doc = doc.replace(section, f'**{section}**')
+    return doc
+
+def remove_over_linebreaks_python(doc):
+    '''
+    Description:
+    This function identifies any python code blocks in the docstring and replaces double line break with single line break.
+    Arguments:
+    - doc: str
+        The docstring of the class or function
+
+    Returns:
+    - str
+        The docstring with the over linebreaks removed.
+    '''
+    starts, ends = [], []
+    lines = doc.split('\n\n')
+    for i, line in enumerate(lines):
+        if line.strip().startswith('```python'): starts.append(i)
+        elif line.strip().startswith('```'): ends.append(i)
+    for start, end in zip(starts, ends):
+        python_block = '\n\n'.join(lines[start:end]) + '\n\n'
+        replacement = python_block.replace('\n\n', '\n')
+        doc = doc.replace(python_block, replacement)
+    
     return doc

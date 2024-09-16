@@ -44,7 +44,7 @@ def plot_GCD(*files, labels=[], use_params=False, ax=plt.gca()):
     plt.legend()
     plt.show()
     ```
-    ![Example of plot_GCD figure](/SuperCap/ReadMeImages/plot_GCD.pdf)
+    ![Example of plot_GCD figure](/SuperCap/ReadMeImages/plot_GCD.png)
     '''
     # In GCD experiments, constant current is applied.
     # Voltage is plotted against time.
@@ -59,7 +59,8 @@ def plot_GCD(*files, labels=[], use_params=False, ax=plt.gca()):
 
     def plot_one_file(file, label, params):
         '''
-    
+        Description:
+        This function is internal to plot_GCD and plots the voltage against time for a single file.
         '''
         ax.plot(file.elapsed_time(start_time), file.E, label=label, **params)
 
@@ -75,6 +76,26 @@ def plot_GCD(*files, labels=[], use_params=False, ax=plt.gca()):
         
 def plot_GCD_E_vs_Q(*files, labels=[], use_params=False, charge_unit='C', ax=plt.gca()):
     '''
+    Description:
+    For a GCD experiment, voltage is generally scanned between two limits.
+    This function plots the voltage against the charge passed in Coulomns.
+    Each time the scan direction changes, the charge is reset to zero.
+
+    Arguments:
+    - *files: Data (usually ECLab_File)
+        The data files to be plotted.
+    - labels = []: list
+        The labels to be used for the legend. Default is empty list which means no \
+        entries added to legend.
+    - use_params = False: bool
+        If True, then the style each file is plotted with is determined by \
+        the file's plot_params attribute. Default is to use the default plot style.
+    - charge_unit = 'C': str
+        The units of charge to be plotted. Default is Coulombs. Other option in 'mAh'.
+    - ax = plt.gca(): matplotlib.pyplot.Axes
+        The axes object to plot the data on. Default is the current axis.
+
+    Examples:
     
     '''
     # In GCD experiments, constant current is applied.
