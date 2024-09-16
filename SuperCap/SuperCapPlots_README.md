@@ -107,17 +107,86 @@ The axes object to plot the data on. Default is the current axis.
 
 **Examples:**
 
+```python
+from ECAnalyse.SuperCap.SuperCapPlots import *
+from ECAnalyse.File_Types import ECLab_File
+from ECAnalyse.custom_plt.color_palettes import IBM
+GCD = ECLab_File('/Users/jack/Documents/GitHub/ECAnalyse/tests/data_files/ACC-20, 1M Na2SO4, N2 10mlmin-1, CO2 2,5mlmin-1, 2,5rpm_C01.txt')
+GCD_0123 = GCD.cycles(0,1,2,3)
+GCD_6789 = GCD.cycles(6,7,8,9)
+GCD_1112  = GCD.cycles(11,12)
+GCD_0123.plot_params = {'color': IBM[0], 'linestyle': '-'}
+GCD_6789.plot_params = {'color': IBM[1], 'linestyle': '--'}
+GCD_1112.plot_params = {'color': IBM[2], 'linestyle': ':'}
+plot_GCD_E_vs_Q(GCD_0123, GCD_6789, GCD_1112, labels=['0,1,2,3', '6,7,8,9', '11,12'], use_params=True)
+plt.title('Example of a Voltage vs Charge plot')
+plt.legend()
+plt.show()
+```
 
+
+
+![Example of plot_GCD_E_vs_Q figure](/SuperCap/ReadMeImages/plot_GCD_E_vs_Q.png)
 
 
 ## `plot_one_cycle`
 
+**Description:**
 
+Internal function to plot_GCD_E_vs_Q
 
 
 # `plot_GCD_C_vs_E`
 
+**Description:**
 
+This function uses `capacitance_using_voltage_difference` to calculate the capacitance at each voltage
+
+and then plots this calculated capacitance against the measured voltage.
+
+
+
+**Arguments:**
+
+- *files: Data (usually ECLab_File)
+
+The data files to be plotted.
+
+- labels = []: list
+
+The labels to be used for the legend. Default is empty list which means no entries added to legend.
+
+- use_params = False: bool
+
+If True, then the style each file is plotted with is determined by the file's plot_params attribute. Default is to use the default plot style.
+
+- ax = plt.gca(): matplotlib.pyplot.Axes
+
+The axes object to plot the data on. Default is the current axis.
+
+
+
+**Examples:**
+
+```python
+from ECAnalyse.auto_readme import auto_readme
+from ECAnalyse.SuperCap.SuperCapPlots import *
+from ECAnalyse.File_Types import ECLab_File
+from ECAnalyse.custom_plt.color_palettes import IBM
+GCD = ECLab_File('/Users/jack/Documents/GitHub/ECAnalyse/tests/data_files/ACC-20, 1M Na2SO4, N2 10mlmin-1, CO2 2,5mlmin-1, 2,5rpm_C01.txt')
+GCD_123 = GCD.cycles(1,2,3)
+GCD_6789 = GCD.cycles(6,7,8,9)
+GCD_1112  = GCD.cycles(11,12)
+GCD_123.plot_params = {'color': IBM[0], 'linestyle': '-'}
+GCD_6789.plot_params = {'color': IBM[1], 'linestyle': '--'}
+GCD_1112.plot_params = {'color': IBM[2], 'linestyle': ':'}
+plot_GCD_C_vs_E(GCD_123, GCD_6789, GCD_1112, labels=['0,1,2,3', '6,7,8,9', '11,12'], use_params=True)
+plt.title('Example of a Capacitance vs Voltage Plot')
+plt.legend()
+plt.show()
+```
+
+![Example of plot_GCD_C_vs_E figure](/SuperCap/ReadMeImages/plot_GCD_C_vs_E.png)
 
 
 ## `make_plot`
