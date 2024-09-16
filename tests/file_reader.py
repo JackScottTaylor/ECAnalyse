@@ -9,6 +9,7 @@ data_files_dir = os.path.join(repository_path, 'data_files')
 
 from ..Data import Data
 from ..File_Types import ECLab_File
+from ..File_Types import Aranet_File
 
 def test_reading_ECLab_Files():
     # This test ensures that ECLab_File can correctly extract data from an ECLab file.
@@ -98,3 +99,9 @@ def test_ECLab_File_cycles():
     file2_cycles_1_2 = file2.cycles(1, 2)
     correct_end_time = datetime.datetime.strptime('07/11/2024 15:41:35.6007', "%m/%d/%Y %H:%M:%S.%f")
     assert file2_cycles_1_2.end_time == correct_end_time, f'End time should be {correct_end_time} for cycles 1-2 but is {file2_cycles_1_2.end_time}.'
+
+def test_Read_Aranet_File():
+    ara_test = "data_files/Aranet4_11EF7_2024-09-06T15_52_510100.csv"
+    ara_test_real = Aranet_File(os.path.join(repository_path, ara_test))
+
+    print(ara_test_real.n[10110])
