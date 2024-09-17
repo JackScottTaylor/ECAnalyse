@@ -1,1 +1,1 @@
-from .auto_readme import auto_readme
+from .auto_readme import write_all_file_readmes
