@@ -241,6 +241,8 @@ def plot_GCD_specific_C_vs_E(mass1, *files, mass2=None, labels=[], use_params=Fa
         the file's plot_params attribute. Default is to use the default plot style.
     - ax = plt.gca(): matplotlib.pyplot.Axes
         The axes object to plot the data on. Default is the current axis.
+
+    Examples:
     '''
     # Similar to plot_GCD_C_vs_E but uses specific capacitance instead.
     # If only one mass provided then the same mass is used for both.
