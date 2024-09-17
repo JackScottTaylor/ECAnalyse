@@ -191,12 +191,44 @@ plt.show()
 
 ## `make_plot`
 
+**Description:**
 
+Internal function to plot_GCD_C_vs_E
 
 
 # `plot_GCD_specific_C_vs_E`
 
+**Description:**
 
+This function calculates the specific capacitance by dividing the capacitance by the mean mass. The capacitance is also multiplied by two to account for the two double layers.
+
+
+
+**Arguments:**
+
+- mass1: float
+
+The mass of the first electrode in grams.
+
+- *files: Data (usually ECLab_File)
+
+The data files to be plotted.
+
+- mass2 = None: float
+
+The mass of the second electrode in grams. If None then the same mass is used for both.
+
+- labels = []: list
+
+The labels to be used for the legend. Default is empty list which means no entries added to legend.
+
+- use_params = False: bool
+
+If True, then the style each file is plotted with is determined by the file's plot_params attribute. Default is to use the default plot style.
+
+- ax = plt.gca(): matplotlib.pyplot.Axes
+
+The axes object to plot the data on. Default is the current axis.
 
 
 ## `make_plot`
