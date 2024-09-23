@@ -308,3 +308,6 @@ class PV_Mass_Spec_File(Data):
                         self.data[data_name].append(self.convert_absolute_time_to_elapsed_time(values[index]))
                     else:
                         self.data[data_name].append(float(values[index]))
+            
+            # Convert all lists of data into numpy arrays
+            for data_name in data_names: self.data[data_name] = np.array(self.data[data_name])
