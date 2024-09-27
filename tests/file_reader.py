@@ -104,4 +104,11 @@ def test_Read_Aranet_File():
     ara_test = "data_files/Aranet4_11EF7_2024-09-06T15_52_510100.csv"
     ara_test_real = Aranet_File(os.path.join(repository_path, ara_test))
 
+
+    assert ara_test_real.start_time == datetime.datetime.strptime("27/07/2024 22:39:48", "%d/%m/%Y %H:%M:%S"), f"We are reading the start time incorrectly."
+    assert ara_test_real.end_time == datetime.datetime.strptime("06/09/2024 15:52:07","%d/%m/%Y %H:%M:%S"),f"We are reading the end time incorrectly"
+    assert ara_test_real
+    assert ara_test_real.n[10110] == np.nan, f"We are reading empty cells incorrectly."
+
+
     print(ara_test_real.n[10110])
