@@ -9,7 +9,31 @@ from .color_palettes import *
 # standard values.
 fig_w, fig_h = 8.3, 6.225
 
+from matplotlib.pyplot import plot as ref_plot
+
 import matplotlib.pyplot as plt
+import numpy as np
+
+def plot(*args, scalex=True, scaley=True, data=None, 
+         roll_av=1, raw_transp=False, **kwargs):
+    '''
+    Redefinition of matplotlib.pyplot plot method so that can add some convenience
+    One option to add is performing rolling average and plotting the raw in transparent.
+    '''
+    if raw_transp:
+        kwargs['alpha'] = 0.25
+        label = ''
+        if 'label' in kwargs.keys(): label = kwargs['label']
+        kwargs['label'] = ''
+        t_plot = ref_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+        kwargs['alpha'] = 1
+        kwargs['color'] = t_plot[0].get_color()
+        kwargs['label'] = label
+
+    args = [np.convolve(arg, np.ones(roll_av), 'valid') / roll_av for arg in args]
+    ref_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+    
+
 def custom_plt():
     plt.rcParams['lines.linewidth'] 				= 3                      # Linewidth
     plt.rcParams['figure.figsize'] 					= [fig_w, fig_h]         # Figure size
@@ -29,4 +53,6 @@ def custom_plt():
     plt.rcParams['axes.prop_cycle'] 				= plt.cycler(color=IBM)  # Color cycle
     plt.rcParams['legend.frameon']                  = True                   # Legend frame on
     plt.rcParams['legend.fontsize']                 = 20                     # Legend font size
+
+    plt.plot = plot
     return plt
