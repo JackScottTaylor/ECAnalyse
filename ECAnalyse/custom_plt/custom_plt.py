@@ -1,7 +1,6 @@
 # This module contains the function custom_plt which sets a series of custom parameters for matplotlib plots.
 # and then returns the customised plt object so it can be used as people are used to.
 
-
 from .color_palettes import *
 
 # These are explicitly defined here so that they can be accessed
@@ -9,11 +8,12 @@ from .color_palettes import *
 # standard values.
 fig_w, fig_h = 8.3, 6.225
 
-from matplotlib.pyplot import plot as ref_plot
-from matplotlib.pyplot import subplots as subplots_ref
-from matplotlib.pyplot import gca as gca_ref
-
 import matplotlib.pyplot as plt
+
+plt.old_plot        = plt.plot
+plt.old_subplots    = plt.subplots
+plt.old_gca         = plt.gca
+
 import numpy as np
 
 
@@ -28,13 +28,13 @@ def plot(*args, scalex=True, scaley=True, data=None,
         label = ''
         if 'label' in kwargs.keys(): label = kwargs['label']
         kwargs['label'] = ''
-        t_plot = ref_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+        t_plot = plt.old_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
         kwargs['alpha'] = 1
         kwargs['color'] = t_plot[0].get_color()
         kwargs['label'] = label
 
     args = [np.convolve(arg, np.ones(roll_av), 'valid') / roll_av for arg in args]
-    ref_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+    plt.old_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
 
 
 def gen_ax_plot(ax):
@@ -67,7 +67,7 @@ def subplots(nrows=1, ncols=1, *empty, sharex=False, sharey=False, squeeze=True,
     It renames the original Axes.plot function and then defines a new Axes.plot function
     which included the extra functionality.
     '''
-    fig, axs = subplots_ref(nrows=nrows, ncols=ncols, *empty, sharex=sharex, sharey=sharey,
+    fig, axs = plt.old_subplots(nrows=nrows, ncols=ncols, *empty, sharex=sharex, sharey=sharey,
                             squeeze=True, width_ratios=width_ratios, height_ratios=height_ratios,
                             subplot_kw=subplot_kw, gridspec_kw=gridspec_kw,
                             **fig_kw)
@@ -80,7 +80,7 @@ def subplots(nrows=1, ncols=1, *empty, sharex=False, sharey=False, squeeze=True,
     return fig, axs
 
 def gca():
-    ax = gca_ref()
+    ax = plt.old_gca()
     ax.old_plot = ax.plot
     ax.plot = gen_ax_plot(ax)
     return ax
