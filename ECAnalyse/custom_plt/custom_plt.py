@@ -10,9 +10,12 @@ from .color_palettes import *
 fig_w, fig_h = 8.3, 6.225
 
 from matplotlib.pyplot import plot as ref_plot
+from matplotlib.pyplot import subplots as subplots_ref
+from matplotlib.pyplot import gca as gca_ref
 
 import matplotlib.pyplot as plt
 import numpy as np
+
 
 def plot(*args, scalex=True, scaley=True, data=None, 
          roll_av=1, raw_transp=False, **kwargs):
@@ -32,7 +35,55 @@ def plot(*args, scalex=True, scaley=True, data=None,
 
     args = [np.convolve(arg, np.ones(roll_av), 'valid') / roll_av for arg in args]
     ref_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
-    
+
+
+def gen_ax_plot(ax):
+    def ax_plot(*args, scalex=True, scaley=True, data=None, 
+            roll_av=1, raw_transp=False, **kwargs):
+        '''
+        Creating new plot function for Axes to match redifintion of pyplot plot.
+        '''
+        if raw_transp:
+            kwargs['alpha'] = 0.25
+            label = ''
+            if 'label' in kwargs.keys(): label = kwargs['label']
+            kwargs['label'] = ''
+            t_plot = ax.old_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+            kwargs['alpha'] = 1
+            kwargs['color'] = t_plot[0].get_color()
+            kwargs['label'] = label
+
+        args = [np.convolve(arg, np.ones(roll_av), 'valid') / roll_av for arg in args]
+        ax.old_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+    return ax_plot
+
+
+
+def subplots(nrows=1, ncols=1, *empty, sharex=False, sharey=False, squeeze=True,
+             width_ratios=None, height_ratios=None, subplot_kw=None, gridspec_kw=None,
+             **fig_kw):
+    '''
+    This function redefines the subplots function of pyplot.
+    It renames the original Axes.plot function and then defines a new Axes.plot function
+    which included the extra functionality.
+    '''
+    fig, axs = subplots_ref(nrows=nrows, ncols=ncols, *empty, sharex=sharex, sharey=sharey,
+                            squeeze=True, width_ratios=width_ratios, height_ratios=height_ratios,
+                            subplot_kw=subplot_kw, gridspec_kw=gridspec_kw,
+                            **fig_kw)
+    if not type(axs) == np.ndarray: axs = [axs]
+    for ax in axs:
+        ax.old_plot = ax.plot
+        ax.plot = gen_ax_plot(ax)
+
+    if len(axs) == 1: return fig, axs[0]
+    return fig, axs
+
+def gca():
+    ax = gca_ref()
+    ax.old_plot = ax.plot
+    ax.plot = gen_ax_plot(ax)
+    return ax
 
 def custom_plt():
     plt.rcParams['lines.linewidth'] 				= 3                      # Linewidth
@@ -55,4 +106,6 @@ def custom_plt():
     plt.rcParams['legend.fontsize']                 = 20                     # Legend font size
 
     plt.plot = plot
+    plt.subplots = subplots
+    plt.gca = gca
     return plt
