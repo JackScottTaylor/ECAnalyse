@@ -34,7 +34,7 @@ def plot(*args, scalex=True, scaley=True, data=None,
         kwargs['label'] = label
 
     args = [np.convolve(arg, np.ones(roll_av), 'valid') / roll_av for arg in args]
-    plt.old_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+    return plt.old_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
 
 
 def gen_ax_plot(ax):
@@ -54,7 +54,7 @@ def gen_ax_plot(ax):
             kwargs['label'] = label
 
         args = [np.convolve(arg, np.ones(roll_av), 'valid') / roll_av for arg in args]
-        ax.old_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+        return ax.old_plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
     return ax_plot
 
 
