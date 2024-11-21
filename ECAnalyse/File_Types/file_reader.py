@@ -5,6 +5,8 @@ The Data class is a generic data object which is used to store data from differe
 
 import numpy as np
 import datetime
+import pandas as pd
+from galvani import BioLogic
 from ..Data import Data
 
 class ECLab_File(Data):
@@ -51,7 +53,7 @@ class ECLab_File(Data):
         '''
         Description:
         INTERNAL FUNCTION CALLED DURING INITIALIZATION.
-        This function handles reading the data from the text file, handling the time data, and storing \
+        This function handles reading the data from the text or .mpr file, handling the time data, and storing
         everything in the self.data dictionary.
         
         Arguments:
@@ -59,11 +61,16 @@ class ECLab_File(Data):
             The path of the ECLab txt file to be read.
 
         Methodology:
+        - The file is saved as a .txt file if it is a .mpr file.
         - The data is extracted from the file
         - The data_names are stored in self.data_names
         - Time is converted to elapsed time and the start and end times are set.
         - All data stored as numpy arrays in self.data
         '''
+        # The function checks whether file_name is a .mpr or a .txt file.
+        # If it is a .mpr file, it is saved as a .txt file, then file_name is updated to remove .mpr and add .txt.
+        if file_name[-4:] == '.mpr': self.mpr_to_txt(file_name)
+        file_name = file_name.replace('.mpr', '.txt')
         # The first line contains some mus and therefore is encoded with latin1
         # instead of the usual UTF-8
         with open(file_name, encoding='latin1') as file:
@@ -78,7 +85,7 @@ class ECLab_File(Data):
             for name in self.data_names: self.data[name] = []
             
             # The remaining lines are iterated through, split and appended to the correct data list.
-            # If the value contians a ':' then this implies it is a date.
+            # If the value contains a ':' then this implies it is a date.
             # If absolute time is saved, then this is converted in to elapsed time and the start and end
             # absolute times are saved.
             # All lists are converted to numpy arrays.
@@ -91,6 +98,32 @@ class ECLab_File(Data):
 
         # Finally set the end_time, assuming that 'time/s' has been recorded.
         if 'time/s' in self.data_names: self.end_time = self.convert_elapsed_time_to_datetime(self.data['time/s'][-1])
+
+
+    def mpr_to_txt(self, file_name):
+        '''
+        Description: INTERNAL FUNCTION CALLED DURING INITIALIZATION.
+        This function reads data from an ECLab .mpr file and saves it as a .txt file so that extract_data can read it.
+
+        Arguments:
+        - file_name: str
+            The path of the .mpr file to be read.
+
+        Methodology:
+        - The data is read from the .mpr file using the BioLogic package.
+        - The data is saved as a .txt file.
+        '''
+        # Open the .mpr file using BioLogic.MPRfile
+        mpr_file = BioLogic.MPRfile(file_name)
+        # Extract the .data variable
+        data = mpr_file.data    
+        # Convert the data to a pandas DataFrame
+        df = pd.DataFrame(data)
+        # Make the new file name with .txt instead of .mpr
+        txt_file_name = file_name.replace('.mpr', '.txt')
+        # Save the DataFrame as a .txt file
+        df.to_csv(txt_file_name, sep='\t', index=False)
+        
 
     
     def cycle(self, c):
