@@ -36,7 +36,8 @@ IBM = [
     '#648FFF',
     '#FFB000',
     '#785EF0',
-    '#FE6100'
+    '#FE6100',
+    '#9B3D58'
 ]
 
 # Found at 'https://stackoverflow.com/questions/65013406/how-to-generate-30-distinct-colors-that-are-color-blind-friendly'
