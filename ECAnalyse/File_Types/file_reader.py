@@ -85,6 +85,7 @@ class ECLab_File(Data):
             for line in file.readlines():
                 values  = line.split('\t')
                 for value, data_name in zip(values, self.data_names):
+                    value = value.strip()
                     if ':' in value: self.data[data_name].append(self.convert_absolute_time_to_elapsed_time(value))
                     else: self.data[data_name].append(float(value))
             for data_name in self.data_names: self.data[data_name] = np.array(self.data[data_name])
