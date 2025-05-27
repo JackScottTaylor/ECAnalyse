@@ -125,7 +125,7 @@ class ECLab_File(Data):
             self.convert_absolute_time_to_elapsed_time(start_time)
 
             # The data names are on the next line separated by semicolons
-            data_names = file.readline().split(';')[:-1]
+            data_names = file.readline().split(';')
             self.initialise_data_dict(data_names)
 
             # Time can either be reported as elapsed time or in absolute date
@@ -145,12 +145,12 @@ class ECLab_File(Data):
             for line in file:
                 self.record_data(line, parser)
                 
-            # Convert in to numpy arrays
-            for data_name in self.data_names:
-                self.data[data_name] = np.array(self.data[data_name])
+        # Convert in to numpy arrays
+        for data_name in self.data_names:
+            self.data[data_name] = np.array(self.data[data_name])
 
         # Finally set the end_time, assuming that 'time/s' has been recorded.
-        if time_data_found:
+        if 'time/s' in self.data_names:
             # Ensure the time starts from 0
             self.data['time/s'] = self.data['time/s'] - self.data['time/s'][0]
             end_time = self.data['time/s'][-1]
@@ -167,6 +167,7 @@ class ECLab_File(Data):
         data_names = [x.replace('<', '')  for x in data_names]
         data_names = [x.replace('>', '')  for x in data_names]
         data_names = [x.replace('"', '')  for x in data_names]
+        data_names = [x.rstrip()          for x in data_names]
         # Create empty list in self.data for each data name
         for name in data_names: self.data[name] = []
         self.data_names = data_names
@@ -193,8 +194,11 @@ class ECLab_File(Data):
         def parse(line):
             vals = line.strip().split(delimeter)
             date = vals[time_index]
-            vals[time_index] = self.convert_absolute_time_to_elapsed_time(date)
-            return [float(x) if x else np.nan for x in vals]
+            vals[time_index] = ''
+            elapsed_time = self.convert_absolute_time_to_elapsed_time(date)
+            parsed = [float(x) if x.strip() else np.nan for x in vals]
+            parsed[time_index] = elapsed_time
+            return parsed
         return parse
     
     def record_data(self, line: str, parser: Callable[[str], List[float]]):
