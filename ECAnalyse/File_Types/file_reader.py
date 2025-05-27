@@ -118,8 +118,12 @@ class ECLab_File(Data):
             # "Technique started on : ";03/21/2025 04:33:06.786
             # Calling convert_absolute_time_to_alapsed_time set this as the 
             # start time.
-            start_time_line = file.readline().split(';')[-1]
-            self.convert_absolute_time_to_elapsed_time(start_time_line)
+            start_time = file.readline().split(';')[-1]
+            # Pad to make sure correct number of decimal points
+            date_part, ms_part = start_time.split('.')
+            start_time = f"{date_part}.{ms_part.strip().ljust(6, '0')}"
+            print('start_time: ', start_time)
+            self.convert_absolute_time_to_elapsed_time(start_time)
 
             # The data names are on the next line separated by semicolons
             data_names = file.readline().split(';')[:-1]
@@ -175,6 +179,7 @@ class ECLab_File(Data):
         :param delimeter: The delimeter used in the file
         '''
         def parse(line):
+            vals = line.split(delimeter)
             return [float(x) for x in line.split(delimeter)]
         return parse
     
