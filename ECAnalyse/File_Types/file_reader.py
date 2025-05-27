@@ -64,7 +64,7 @@ class ECLab_File(Data):
 
     def extract_from_txt(self, file_path: str):
         '''
-        Internally called function used to extract data from a .txt formatted 
+        Internally called function used to extract data from a .csv formatted 
         ECLab data file. 
 
         :param file_path: The path to the .txt formatted ECLab data file
@@ -104,6 +104,53 @@ class ECLab_File(Data):
             end_time = self.data['time/s'][-1]
             self.end_time = self.convert_elapsed_time_to_datetime(end_time)
 
+    def extract_from_csv(self, file_path: str):
+        '''
+        Internally called function used to extract data from a .txt formatted 
+        ECLab data file. 
+
+        :param file_path: The path to the .csv formatted ECLab data file
+        '''
+        # The first line contains some mus and therefore is encoded with latin1
+        # instead of the usual UTF-8
+        with open(file_path, encoding='latin1') as file:
+            # For csv files the first line is formatted
+            # "Technique started on : ";03/21/2025 04:33:06.786
+            # Calling convert_absolute_time_to_alapsed_time set this as the 
+            # start time.
+            start_time_line = file.readline().split(';')[-1]
+            self.convert_absolute_time_to_elapsed_time(start_time_line)
+
+            # The data names are on the next line separated by semicolons
+            data_names = file.readline().split(';')[:-1]
+            self.initialise_data_dict(data_names)
+
+            # Time can either be reported as elapsed time or in absolute date
+            # format. Here we determine from the first line the time format
+            # and choose the correct extraction method accordingly.
+            parser = self.parse_elapsed_time_format(delimeter=';')
+            time_data_found = 'time/s' in data_names
+            if time_data_found:
+                time_index = data_names.index('time/s')
+                line = file.readline()
+                if ':' in line.split('\t')[time_index]:
+                    parser = self.parse_date_time_format(time_index,
+                                                         delimeter=';')
+                self.record_data(line, parser)
+            
+            # Using the correct parser, read in all of the data and save it.
+            for line in file:
+                self.record_data(line, parser)
+                
+            # Convert in to numpy arrays
+            for data_name in self.data_names:
+                self.data[data_name] = np.array(self.data[data_name])
+
+        # Finally set the end_time, assuming that 'time/s' has been recorded.
+        if time_data_found:
+            end_time = self.data['time/s'][-1]
+            self.end_time = self.convert_elapsed_time_to_datetime(end_time)
+
     def initialise_data_dict(self, data_names: List[str]):
         '''
         Internal function called by extracting data methods which reformats 
@@ -114,6 +161,7 @@ class ECLab_File(Data):
         data_names = [x.replace('µ', 'u') for x in data_names]
         data_names = [x.replace('<', '')  for x in data_names]
         data_names = [x.replace('>', '')  for x in data_names]
+        data_names = [x.replace('"', '')  for x in data_names]
         # Create empty list in self.data for each data name
         for name in data_names: self.data[name] = []
         self.data_names = data_names
