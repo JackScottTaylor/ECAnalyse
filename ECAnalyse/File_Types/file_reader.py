@@ -148,6 +148,8 @@ class ECLab_File(Data):
 
         # Finally set the end_time, assuming that 'time/s' has been recorded.
         if time_data_found:
+            # Ensure the time starts from 0
+            self.data['time/s'] = self.data['time/s'] - self.data['time/s'][0]
             end_time = self.data['time/s'][-1]
             self.end_time = self.convert_elapsed_time_to_datetime(end_time)
 
