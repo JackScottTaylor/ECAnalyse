@@ -122,7 +122,6 @@ class ECLab_File(Data):
             # Pad to make sure correct number of decimal points
             date_part, ms_part = start_time.split('.')
             start_time = f"{date_part}.{ms_part.strip().ljust(6, '0')}"
-            print('start_time: ', start_time)
             self.convert_absolute_time_to_elapsed_time(start_time)
 
             # The data names are on the next line separated by semicolons
@@ -179,8 +178,8 @@ class ECLab_File(Data):
         :param delimeter: The delimeter used in the file
         '''
         def parse(line):
-            vals = line.split(delimeter)
-            return [float(x) for x in line.split(delimeter)]
+            vals = line.strip().split(delimeter)
+            return [float(x) if x.strip() else np.nan for x in line.split(delimeter)]
         return parse
     
     def parse_date_time_format(self, time_index: int,
@@ -192,10 +191,10 @@ class ECLab_File(Data):
         :param delimeter: The delimeter used in the file
         '''
         def parse(line):
-            vals = line.split(delimeter)
+            vals = line.strip().split(delimeter)
             date = vals[time_index]
             vals[time_index] = self.convert_absolute_time_to_elapsed_time(date)
-            return [float(x) for x in vals]
+            return [float(x) if x else np.nan for x in vals]
         return parse
     
     def record_data(self, line: str, parser: Callable[[str], List[float]]):
