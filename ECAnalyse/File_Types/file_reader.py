@@ -47,8 +47,8 @@ class ECLab_File(Data):
         The data for these is stored in the attributes t, E, I and c respectively.
         '''
         self.set_attributes(
-            ['time/s',  'Ewe/V',    'I/mA', 'cycle number'],
-            ['t',       'E',        'I',    'c']
+            ['time/s',  'Ewe/V',    'I/mA', 'cycle number', 'Pressure/bar (on Analog In1)'],
+            ['t',       'E',        'I',    'c',            'P']
         )
 
     def extract_data(self, file_path: str):
