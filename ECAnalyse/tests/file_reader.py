@@ -25,6 +25,27 @@ def test_reading_ECLab_Files():
     assert file2.start_time == datetime.datetime.strptime('07/11/2024 10:31:05.3322', "%m/%d/%Y %H:%M:%S.%f"), f'Start_time should equal 07/11/2024 10:31:05.3322 for file_2 but equals {file2.start_time}'
     assert file2.end_time == datetime.datetime.strptime('07/12/2024 13:50:07.7127', "%m/%d/%Y %H:%M:%S.%f"), f'End_time should equal 07/12/2024 13:50:07.7127 for file_2 but equals {file2.end_time}'
 
+def test_reading_ECLab_CSV():
+    file1 = 'data_files/negative+positive+switching+negative+5min_holds_01_MB_C08.csv'
+    file1 = ECLab_File(os.path.join(repository_path, file1))
+    assert file1.data_names == [
+        'time/s', 'Ewe/V', 'Pressure/bar (on Analog In1)', 'I/mA', 'cycle number'
+    ], "CSV data names not correctly parsed"
+
+    assert file1.t[0] == 0.0, "Elapsed time should start at 0"
+    assert file1.start_time == datetime.datetime.strptime('03/20/2025 16:32:05.155000', "%m/%d/%Y %H:%M:%S.%f")
+    assert file1.P[0] == 0.9791232943534851, "Pressure data wrong"
+
+    file2 = 'data_files/negative+positive+switching+negative+5min_holds_02_CV_C08.csv'
+    file2 = ECLab_File(os.path.join(repository_path, file2))
+    assert file2.data_names == [
+        'time/s', 'Ewe/V', 'Pressure/bar (on Analog In1)', 'I/mA', 'cycle number'
+    ], "CSV data names not correctly parsed"
+
+    assert file2.t[0] == 0.0, "Elapsed time should start at 0"
+    assert file2.start_time == datetime.datetime.strptime('03/21/2025 04:33:06.786000', "%m/%d/%Y %H:%M:%S.%f")
+    assert file2.P[0] == 0.9132810831069946, "Pressure data wrong"
+
 
 def test_in_time_range():
     # This test ensures that the in_time_range function works correctly.
