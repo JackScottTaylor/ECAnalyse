@@ -1,12 +1,15 @@
 import datetime
 import numpy as np
 
+from typing import Union
+
 class Data:
     def __init__(self):
         # This is the generic data object.
         # The attributes below are generally more defined for individual child classes.
         self.data = {}
         self.data_names = []
+        self.attribute_aliases = {}
         self.time_format = ''
         self.t_data_name = ''
         self.start_time, self.end_time = 0, 0
@@ -100,6 +103,7 @@ class Data:
         # of the Data object using the provided alias.
         for data_name, attribute_alias in zip(data_names, attribute_aliases):
             if data_name in self.data_names: setattr(self, attribute_alias, self.data[data_name])
+            self.attribute_aliases[attribute_alias] = data_name
 
 
     def set_commonly_accessed_attributes(self):
@@ -186,3 +190,46 @@ class Data:
         new_data.set_commonly_accessed_attributes()
 
         return new_data
+    
+    def data_key(self, d: str) -> str:
+        '''
+        This function returns the key for the data_name provided.
+        
+        If d is in self.data_names then it is returned.
+        If d is a set attribute, then the corresponding data_name
+        is returned from self.attribute_aliases.
+        
+        :param d: The name of the data to get the key for.
+        :type d: str
+        :return: The key for the data_name provided.
+        :rtype: str
+        '''
+        if   d in self.data_names: return d
+        elif d in self.attribute_aliases: return self.attribute_aliases[d]
+        else: raise ValueError(
+            f'{d} is not a data_name or common attribute of the Data object.'
+        )
+    
+    def rolling_average(
+            self, *data_names: str, w: int = 1
+            ) -> Union[np.ndarray, tuple[np.ndarray, ...]]:
+        '''
+        This function calculates the rolling average of the data_names provided.
+
+        :param data_names: The names of the data to calculate the rolling average for.
+        :type data_names: str
+        :keyword w: The window size for the rolling average, default is 1.
+        :type w: int
+        :return: Either a single numpy array or a tuple of numpy arrays
+        '''
+        kernel = np.ones(w) / w  # Create a kernel for the rolling average.
+        roll_av_data = []
+        for data_name in data_names:
+            key = self.data_key(data_name)
+            assert w > 0, 'Window size must be greater than 0.'
+            # Apply the convolution to the data.
+            roll_av_data.append(np.convolve(
+                self.data[key], kernel, mode='valid'))
+        return tuple(roll_av_data) if len(roll_av_data) > 1 else roll_av_data[0]
+
+
