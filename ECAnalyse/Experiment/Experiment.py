@@ -5,24 +5,44 @@ experiment.
 from ..Data import Data
 import datetime
 
+from typing import Optional, List
+
 class Experiment:
     '''
     General class for holding experiment data
+
+    :param files: Data objects that are part of the experiment
+    :type files: Data
     '''
     def __init__(self, *files: Data):
         self.files = [file for file in files]
-
-        # Each file should have an associated start_time
-        # therefore we search for the earliest start_time, set this as global,
-        # and then store an elapsed_start_time for each file.
+        # Initialise the start_time as None, if it required then global start
+        # time can be calculated from the files.
         self.start_time = datetime.datetime.now()
-        for file in files:
-            assert file.start_time != 0, "NO START TIME DETECTED"
-            if file.start_time < self.start_time:
-                self.start_time = file.start_time
-        
-        for file in files:
-            elapsed_start_time = file.start_time - self.start_time
-            elapsed_start_time_s = elapsed_start_time.total_seconds()
+
+    def sync_times(self):
+        '''
+        Syncs up the start time of all files in the experiment.
+
+        This function sets the start time of all the files in the experiment to
+        the earliest start time found and changes the elapsed time of each file
+        accordingly.
+        '''
+        # Go through all the files and find if they have a start_time set
+        start_times = []
+        for file in self.files:
+            if type(file.start_time) == datetime.datetime:
+                start_times.append(file.start_time)
+
+        # If datetimes found, then set the start_time to the earliest one.
+        if start_times:
+            self.start_time = min(start_times)
+
+        # Go through the files and if they have a start_time set then set it to 
+        # the experiment start_time and adjust the elapsed time accordingly.
+        for file in self.files:
+            if type(file.start_time) != datetime.datetime: continue
+            delta_T = file.start_time - self.start_time
+            delta_T_seconds = delta_T.total_seconds()
             file.start_time = self.start_time
-            file.t = file.t + elapsed_start_time_s
+            file.t += delta_T_seconds
