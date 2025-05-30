@@ -35,8 +35,8 @@ class GCD(Experiment):
     
     def plot(self, ax: Optional[Axes] = None, labels: Optional[List[str]] = None,
              resize: bool = True, size: tuple = (fig_w*2, fig_h),
-             fig: Optional[Figure] = None,
-             **kwargs) -> Axes:
+             fig: Optional[Figure] = None, rolling: int = 1,
+             plot_raw: bool = True, **kwargs) -> Axes:
         '''
         Plots the GCD experiment data on the provided axes or the current axes.
 
@@ -45,6 +45,11 @@ class GCD(Experiment):
         :param resize: If True, resizes the figure to the specified size.
         :param_size: Size of the figure if resize is True, defaults to full
             page width.
+        :param fig: The figure to plot on. If None, uses the current figure.
+        :param rolling: The window size for the rolling average, defaults to 1
+            (no rolling average).
+        :param plot_raw: If True and rolling > 1, then plots the raw data in 
+            same colour but slightly transparent.
         :param kwargs: Additional keyword arguments for the plot.
         :return: The axes with the plot.
         :raises ValueError: If the files do not contain the required data.
@@ -77,9 +82,19 @@ class GCD(Experiment):
         # All files plotted in the same colour.
         if 'color' not in kwargs:
             kwargs['color'] = 'black'
-        # For each file in the GCD experiment, plot voltage against time.
-        for file, label in zip(self.files, labels):
-            ax.plot(file.t, file.E, label=label, **kwargs)
+        if plot_raw:
+            if rolling > 1: kwargs['alpha'] = 0.5
+            # For each file in the GCD experiment, plot voltage against time.
+            for file, label in zip(self.files, labels):
+                ax.plot(file.t, file.E, label=label, **kwargs)
+        if rolling >1:
+            kwargs['alpha'] = 1.0
+            # For each file in the GCD experiment, plot the rolling average of
+            # voltage against time.
+            for file, label in zip(self.files, labels):
+                t_av, E_av = file.rolling_average('t', 'E', w=rolling)
+                ax.plot(t_av, E_av, label=label, **kwargs)
+
         # Set the axes labels and title.
         ax.set_xlabel('Time / s')
         ax.set_ylabel('Voltage / V')
