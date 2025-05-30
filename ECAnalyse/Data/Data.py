@@ -211,8 +211,8 @@ class Data:
         )
     
     def rolling_average(
-            self, *data_names: str, w: int = 1
-            ) -> Union[np.ndarray, tuple[np.ndarray, ...]]:
+            self, *data_names: str, w: int = 1,
+            mode: str = 'full') -> Union[np.ndarray, tuple[np.ndarray, ...]]:
         '''
         This function calculates the rolling average of the data_names provided.
 
@@ -220,6 +220,8 @@ class Data:
         :type data_names: str
         :keyword w: The window size for the rolling average, default is 1.
         :type w: int
+        :keyword mode: The mode for the convolution, default is 'full'.
+        :type mode: str
         :return: Either a single numpy array or a tuple of numpy arrays
         '''
         kernel = np.ones(w) / w  # Create a kernel for the rolling average.
@@ -229,7 +231,7 @@ class Data:
             assert w > 0, 'Window size must be greater than 0.'
             # Apply the convolution to the data.
             roll_av_data.append(np.convolve(
-                self.data[key], kernel, mode='valid'))
+                self.data[key], kernel, mode=mode))
         return tuple(roll_av_data) if len(roll_av_data) > 1 else roll_av_data[0]
 
 
