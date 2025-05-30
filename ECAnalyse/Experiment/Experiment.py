@@ -18,7 +18,14 @@ class Experiment:
         self.files = [file for file in files]
         # Initialise the start_time as None, if it required then global start
         # time can be calculated from the files.
-        self.start_time = datetime.datetime.now()
+
+        # If one file provided then set self.file to that file and set the
+        # start_time to file's start_time.
+        if len(self.files) == 1:
+            self.file = self.files[0]
+            self.start_time = self.file.start_time
+        else:
+            self.start_time = datetime.datetime.now()
 
     def sync_times(self):
         '''

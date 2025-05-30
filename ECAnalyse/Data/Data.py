@@ -2,6 +2,7 @@ import datetime
 import numpy as np
 
 from typing import Union
+from scipy.ndimage import gaussian_filter1d
 
 class Data:
     def __init__(self):
@@ -233,5 +234,27 @@ class Data:
             roll_av_data.append(np.convolve(
                 self.data[key], kernel, mode=mode))
         return tuple(roll_av_data) if len(roll_av_data) > 1 else roll_av_data[0]
+    
+
+    def gaussian_filter(
+            self, *data_names: str, sigma: float = 1.0
+            ) -> Union[np.ndarray, tuple[np.ndarray, ...]]:
+        '''
+        This function applies a Gaussian filter to the data_names provided.
+
+        :param data_names: The names of the data to apply the Gaussian filter to.
+        :type data_names: str
+        :keyword sigma: The standard deviation for the Gaussian kernel, default is 1.0.
+        :type sigma: float
+        :keyword mode: The mode for the convolution, default is 'valid'.
+        :type mode: str
+        :return: Either a single numpy array or a tuple of numpy arrays
+        '''
+        filtered_data = []
+        for data_name in data_names:
+            key = self.data_key(data_name)
+            filtered_data.append(gaussian_filter1d(
+                self.data[key], sigma=sigma))
+        return tuple(filtered_data) if len(filtered_data) > 1 else filtered_data[0]
 
 
