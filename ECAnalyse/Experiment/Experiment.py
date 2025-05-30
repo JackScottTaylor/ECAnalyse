@@ -46,3 +46,18 @@ class Experiment:
             delta_T_seconds = delta_T.total_seconds()
             file.start_time = self.start_time
             file.t += delta_T_seconds
+
+    def all_files_contain(self, *data_names: str) -> bool:
+        '''
+        Check if all files in the experiment contain the specified data name.
+        
+        :param data_name: The name of the data to check for in all files.
+        :return: True if all files contain the data name, False otherwise.
+        '''
+        # Use the data_key method of the Data class which raises an error if the
+        # data cannot be found
+        for file in self.files:
+            for data_name in data_names:
+                try: file.data_key(data_name)
+                except ValueError: return False     
+        return True   
