@@ -252,4 +252,15 @@ class ECLab_File(Data):
         # Set the common attributes of the new object.
         cycles_file.set_commonly_accessed_attributes()
         return cycles_file
+    
+    def cycle_range(self, cycle_min: int, cycle_max: int) -> 'ECLab_File':
+        '''
+        Returns a new ECLab_File object containing only the data from the
+        specified cycle range.
+        
+        :param cycle_min: The minimum cycle number to be included in the new object
+        :param cycle_max: The maximum cycle number to be included in the new object
+        :return: ECLab_File object containing only the data from the specified cycle range
+        '''
+        return self.in_data_range('c', cycle_min, cycle_max)
         
