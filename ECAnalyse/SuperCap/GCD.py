@@ -1,12 +1,13 @@
 from __future__ import annotations  # For type hinting self in class methods
 
 from ..Experiment.Experiment import Experiment
-from ..custom_plt import plt
+from ..custom_plt import plt, fig_h, fig_w
 
 from typing import TYPE_CHECKING, Optional, List, Union
 if TYPE_CHECKING:
     from ..File_Types import ECLab_File
     from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 
 class GCD(Experiment):
     '''
@@ -33,12 +34,17 @@ class GCD(Experiment):
 
     
     def plot(self, ax: Optional[Axes] = None, labels: Optional[List[str]] = None,
+             resize: bool = True, size: tuple = (fig_w*2, fig_h),
+             fig: Optional[Figure] = None,
              **kwargs) -> Axes:
         '''
         Plots the GCD experiment data on the provided axes or the current axes.
 
         :param ax: The axes to plot on. If None, uses the current axes.
         :param labels: Optional list of labels for the plot.
+        :param resize: If True, resizes the figure to the specified size.
+        :param_size: Size of the figure if resize is True, defaults to full
+            page width.
         :param kwargs: Additional keyword arguments for the plot.
         :return: The axes with the plot.
         :raises ValueError: If the files do not contain the required data.
@@ -50,6 +56,11 @@ class GCD(Experiment):
             raise ValueError("All files must contain time and voltage data, " \
                              "which should be stored as 't' and 'E' " \
                              "attributes of the Data object")
+        # If resize is True, then resizes the figure provided or the current
+        # figure if figure is not provided.
+        if resize:
+            if fig is None: fig = plt.gcf()
+            fig.set_size_inches(size[0], size[1])
         # If labels not provided, then create a list of empty strings
         # If labels provided, check that correct number provided.
         if labels is None:
