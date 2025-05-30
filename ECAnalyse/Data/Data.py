@@ -212,7 +212,7 @@ class Data:
     
     def rolling_average(
             self, *data_names: str, w: int = 1,
-            mode: str = 'full') -> Union[np.ndarray, tuple[np.ndarray, ...]]:
+            mode: str = 'valid') -> Union[np.ndarray, tuple[np.ndarray, ...]]:
         '''
         This function calculates the rolling average of the data_names provided.
 
