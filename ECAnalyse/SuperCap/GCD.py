@@ -3,7 +3,7 @@ from __future__ import annotations  # For type hinting self in class methods
 from ..Experiment.Experiment import Experiment
 from ..custom_plt import plt
 
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Union
 if TYPE_CHECKING:
     from ..File_Types import ECLab_File
     from matplotlib.axes import Axes
@@ -13,9 +13,23 @@ class GCD(Experiment):
     Class for handling a GCD (Galvanostatic Charge-Discharge) experiment.
     
     :param files: ECLab_File objects that make up the GCD experiment.
+    :type files: ECLab_File
+    :param mass1: Mass of the first electrode in mg, defaults to 0.0.
+    :type mass1: float or List[float], optional
+    :param mass2: Mass of the second electrode in mg, defaults to 0.0.
+    :type mass2: float or List[float], optional
     '''
-    def __init__(self, *files: ECLab_File):
+    def __init__(self, *files: ECLab_File,
+                 mass1: Union[float, List[float]] = 0.0,
+                 mass2: Union[float, List[float]] = 0.0):
         super().__init__(*files)
+
+        # Stores the mass of the first and second electrode, if a list is 
+        # provided then the average over all values is taken.
+        if type(mass1) == List: self.mass1 = sum(mass1) / len(mass1)
+        else:                   self.mass1 = mass1
+        if type(mass2) == List: self.mass2 = sum(mass2) / len(mass2)
+        else:                   self.mass2 = mass2
 
     
     def plot(self, ax: Optional[Axes] = None, labels: Optional[List[str]] = None,
