@@ -4,11 +4,7 @@ To install the python repository, clone in to a directory of your choice and the
 
 Alternately, in Terminal, use the command "python -m pip install -e ~/ECAnalyse/" (where ~ is the directory ECAnalyse is saved into).
 
-## Prerequisites
-- numpy
-- scipy
-- datetime
-- matplotlib
 
-# README Files
-- [File_Types](./File_Types/file_reader_README.md)
+# 📚 Documentation
+
+Read the full docs here: [ECAnalyse Documentation](https://jackscotttaylor.github.io/ECAnalyse/)
