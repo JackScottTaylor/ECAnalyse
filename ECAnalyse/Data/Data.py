@@ -39,6 +39,20 @@ class Data:
         self.data_type:         str                = 'Data'
 
 
+    def summary(self):
+        '''
+        Provides a summary of the Data object
+        '''
+        duration = (self.end_time - self.start_time).total_seconds()
+        print(f"Data Type:       {self.data_type}")
+        print(f"Start Time:      {self.start_time}")
+        print(f"End Time:        {self.end_time}")
+        print(f"Duration:        {duration} seconds")
+        print(f"Data Fields:     {self.data_names}")
+        print(f"Aliases:         {self.attribute_aliases}")
+        print(f"Number of Rows:  {len(next(iter(self.data.values()), []))}")
+
+
     @property
     def data_names(self) -> List[str]:
         '''
@@ -142,44 +156,35 @@ class Data:
             start_time_changes = False
         )
         
-
-        # If both start_times are datetime objects then new_start_time is the earliest of the two.
-        # If both start_times are floats or integers then new_start_time is the smallest of the two.
-        if type(self.start_time) == type(other.start_time):
-            earliest_start_time = min(self.start_time, other.start_time)
-        # Else if one is a datetime object and the other is a float or integer, then set new_start_time
-        # to the datetime object.
-        elif type(self.start_time) == datetime.datetime: earliest_start_time = self.start_time
-        else: earliest_start_time = other.start_time
-        # Set the start_time of the new object to the earliest_start_time.
-        combined_data.start_time = earliest_start_time
-
-        # If there is a data_name corresponding to time, then convert elapsed time in both files
-        # to elapsed time relative to the new_start_time.
+        # At this point we know that both objects have the same data_names
+        # therefore we can check if there is time data by just checking if
+        # time is recorded in the first data file.
         if self.t_data_name in self.data_names:
+            # Now we have to calculate the time differences for the two files
+            # so that we can record data as time elapsed from the new file's
+            # start time
 
-            # Find the earliest_start_time in terms of elapsed time for each file.
-            # If a start_time is a float or integer, then it is already elapsed time.
-            if type(self.start_time) == datetime.datetime:
-                self_relative_start_time = self.convert_datetime_to_elapsed_time(earliest_start_time)
-            else: self_relative_start_time = - self.start_time
-
-            if type(other.start_time) == datetime.datetime:
-                other_relative_start_time = other.convert_datetime_to_elapsed_time(earliest_start_time)
-            else: other_relative_start_time = - other.start_time
-
-            # Convert the time data to elapsed time relative to the new_start_time.
-            self_times = self.data[self.t_data_name] - self_relative_start_time
-            other_times = other.data[other.t_data_name] - other_relative_start_time
+            self_rel_start_time = self.convert_datetime_to_elapsed_time(
+                                                       combined_data.start_time
+                                                       )
+            other_rel_start_time = other.convert_datetime_to_elapsed_time(
+                                                       combined_data.start_time
+                                                       )
+            # Apply reference to the two sets of time data
+            self_times  = self.data[self.t_data_name]   - self_rel_start_time
+            other_times = other.data[other.t_data_name] - other_rel_start_time
 
             # Combine the time data and set the end_time of the new object.
-            combined_data.data[self.t_data_name] = np.concatenate((self_times, other_times))
-            combined_data.end_time = combined_data.convert_elapsed_time_to_datetime(combined_data.data[self.t_data_name][-1])
+            combined_data.data[self.t_data_name] = np.concatenate(
+                                                      (self_times, other_times)
+                                                      )
 
-        # For all other data_names, concatenate the data arrays.
-        for data_name in combined_data.data_names:
+        # For all other data_names, concatenate the data arrays and add to data
+        for data_name in self.data_names:
             if data_name == combined_data.t_data_name: continue
-            combined_data.data[data_name] = np.concatenate((self.data[data_name], other.data[data_name]))
+            combined_data.data[data_name] = np.concatenate(
+                                   (self.data[data_name], other.data[data_name])
+                                   )
 
         # Set the common attributes of the new object.
         combined_data.set_commonly_accessed_attributes()
@@ -187,126 +192,166 @@ class Data:
         return combined_data
 
 
-    def convert_absolute_time_to_elapsed_time(self, time):
-        # This function takes an absolute time and converts it to elapsed time.
-        # Converted to datetime object using self.time_format.
-        # If self.start_time not already set, then sets provided time to start_time.
+    def convert_absolute_time_to_elapsed_time(self, time: str) -> float:
+        '''
+        This function takes a time representing a date in the format defined in
+        self.time_format. Converts it to a datetime object, calculates and then
+        returns the time in seconds between self.start_time and the time given.
+
+        :param time: String representing date in format of self.date_format
+        :return: Time between self.start_time and given time in seconds
+        '''
         datetime_object = datetime.datetime.strptime(time, self.time_format)
-        if self.start_time == 0: self.start_time = datetime_object
-        return (datetime_object - self.start_time).total_seconds()
+        return self.convert_datetime_to_elapsed_time(datetime_object)
     
 
-    def convert_datetime_to_elapsed_time(self, time):
-        # This function takes a datetime object and converts it to elapsed time.
-        # If self.start_time is not set, then an error is raised.
-        if self.start_time == 0:
-            raise ValueError(
-                'Absolute start_time not defined for data object. Cannot convert datetime to elapsed time.'
-            )
+    def convert_datetime_to_elapsed_time(
+            self,
+            time: datetime.datetime
+            ) -> float:
+        '''
+        Takes a datetime object and calculates the time between self.start_time
+        and the given time and then returns this value.
+
+        :param time: datetime object corresponding to a given date
+        :return: Time in seconds between self.start_time and given time
+        '''
         return (time - self.start_time).total_seconds()
     
 
-    def convert_elapsed_time_to_datetime(self, time):
-        # This function takes an elapsed time in seconds and, using self.start_time,
-        # converts this to an absolute time.
-        # If self.start_time is not set, then the elapsed time is returned.
-        if self.start_time == 0: return time
+    def convert_elapsed_time_to_datetime(
+            self,
+            time: float
+            ) -> datetime.datetime:
+        '''
+        Takes a time in seconds and returns the datetime object corresponding to
+        time seconds since self.start_time
+
+        :param time: Time in seconds since self.start_time
+        :return: datetime object cprresponding to time seconds since
+            self.start_time
+        '''
         return self.start_time + datetime.timedelta(seconds=time)
     
 
-    def set_attributes(self, data_names, attribute_aliases):
-        # This function takes a list of data_names and a list of attribute_aliases.
-        # If data_name is a key in self.data then the data_list is set as an attribute
-        # of the Data object using the provided alias.
+    def set_attributes(
+            self,
+            data_names: List[str],
+            attribute_aliases: List[str]
+            ):
+        '''
+        Takes list of data names and list of aliases. If data name is in
+        self.data_names then it sets the associated data as an attribute of
+        the object with the attribute name being the alias.
+
+        :param data_names: List of data names to create aliases for
+        :param attribute_aliases: The corresponding aliases
+        '''
         for data_name, attribute_alias in zip(data_names, attribute_aliases):
-            if data_name in self.data_names: setattr(self, attribute_alias, self.data[data_name])
-            self.attribute_aliases[attribute_alias] = data_name
+            if data_name in self.data_names:
+                setattr(self, attribute_alias, self.data[data_name])
+                self.attribute_aliases[attribute_alias] = data_name
 
 
     def set_commonly_accessed_attributes(self):
-        # Each child class will have a different set of commonly accessed attributes.
-        # This function is overwritten in each child class.
+        '''
+        Every child class of Data should overwrite this function with the
+        common attributes of that Data type.
+        It is necessary to include here so it can be called generally when
+        combining or slicing Data objects.
+        '''
         self.set_attributes(
             [],
             []
         )
 
-    
-    def in_time_range(self, start, end):
-        # This function is very similar to in_data_range, but just for time data. Time is slightly
-        # more complicated as you may want to describe time range in absolute time whereas the time
-        # data is always stored as elapsed time.
-        
-        # First check that the object has time data, this should always be stored as an attribute
-        # stored as self.t.
-        if not hasattr(self, 't'):
-            raise ValueError(
-                f'{type(self)} object does not contain time data. Cannot determine time range.'
-            )
-        
-        # If start or end is a datetime object, then convert to elapsed time.
-        # convert_datetime_to_elapsed_time raises an error if start_time is not defined.
-        if type(start) == datetime.datetime: start = self.convert_datetime_to_elapsed_time(start)
-        if type(end) == datetime.datetime: end = self.convert_datetime_to_elapsed_time(end)
 
-        # Now check that start and end are both either floats or ints, as they should now correspond
-        # to elapsed time. If not then raise an error.
-        if type(start) != float and type(start) != int:
-            raise ValueError(
-                'Start of time range must be either a float or an integer'
-            )
-        if type(end) != float and type(end) != int:
-            raise ValueError(
-                'End of time range must be either a float or an integer'
-            )
-        
-        # Now use in_data_range method to extract data within the time range.
-        return self.in_data_range('t', start, end)
-    
-    
-    def in_data_range(self, data_name, start, end):
-        # This function returns a new data object containing only the data stored in the range
-        # defined by start <= x <= end for the provided data_name.
-        # Data_name can be and data_name stored in self.data or can be common attribute.
+    def in_data_range(
+            self,
+            data_name: str,
+            minimum:   float,
+            maximum:   float
+            ):
+        '''
+        Returns a new data object the same type as self containing only the data
+        where the data corresponding to data_name falls in the closed region of
+        [minimum, maximum]
 
-        # If data_name is not in self.data_names, then check if it is an attribute.
-        # If not then raise an error.
-        if data_name not in self.data_names:
-            if not hasattr(self, data_name):
-                raise ValueError(
-                    f'{data_name} is not a data_name or common attribute of the Data object.'
-                )
-            else:
-                # If data_name is attribute then check that attribute is a numpy array.
-                # If not then raise an error.
-                if type(getattr(self, data_name)) != np.ndarray:
-                    raise ValueError(
-                        f'{data_name} attribute is not an array.'
-                    )
-                else:                                                               
-                    data = getattr(self, data_name)
-        # If data_name is in self.data_names, then set data to the data stored in self.data.
-        else:
-            data = self.data[data_name]
-
+        :param data_name: The data which to filter by
+        :param minimum: The minimum value the data should take
+        :param maximum: The maximum value the data should take
+        '''
+        # Find key for data_dict corresponding to data required. If not found
+        # then error is raised by self.data_key method.
+        data_dict_key = self.data_key(data_name)
+        data          = self.data[data_dict_key]
 
         # Create a new blank object of the same type as self.
-        new_data = type(self)()
-        new_data.data_names = self.data_names
-        data_mask = (data >= start) & (data <= end)
-        for data_name in self.data_names: new_data.data[data_name] = self.data[data_name][data_mask]
+        new_data  = type(self)()
+        # Find the indices where the inequalities are satisfied
+        data_mask = (data >= minimum) & (data <= maximum)
+        # Add only the correct data to the new data file
+        for data_name in self.data_names:
+            new_data.data[data_name] = self.data[data_name][data_mask]
 
-        # If the data contains time_data, then need to set start and end times and convert the 
-        # elapsed time_data to elapsed time since start of new_data.
-        if new_data.t_data_name in new_data.data_names:
-            new_data.start_time = self.convert_elapsed_time_to_datetime(new_data.data[new_data.t_data_name][0])
-            new_data.end_time   = self.convert_elapsed_time_to_datetime(new_data.data[new_data.t_data_name][-1])
-            new_data.data[new_data.t_data_name] -= new_data.data[new_data.t_data_name][0]
-
+        # In assigning the start_time, we will use the same start_time as self
+        # as there is always the option to zero the time later
+        if self.t_data_name in self.data_names:
+            time_key = self.t_data_name
+            new_data.start_time = self.start_time
+            new_data.end_time   = self.convert_elapsed_time_to_datetime(
+                                        new_data.data[time_key][-1]
+                                        )
         # Set the common attributes of the new_data object.
         new_data.set_commonly_accessed_attributes()
-
         return new_data
+    
+
+    def zero_time(self):
+        '''
+        This method sets the first value in recorded data to be equal to zero
+        and adjusts the start and end times accordingly
+        '''
+        # If no time data then raise error
+        if self.t_data_name not in self.data_names:
+            raise ValueError(
+                f'{type(self)} object does not contain time data.'
+            )
+        delta_t = self.data[self.t_data_name][0]
+        self.data[self.t_data_name] -= delta_t
+        self.start_time = self.start_time - datetime.timedelta(seconds=delta_t)
+        self.end_time   = self.end_time   - datetime.timedelta(seconds=delta_t)
+        
+    
+    def in_time_range(
+            self,
+            start: Union[float, datetime.datetime],
+            end:   Union[float, datetime.datetime]
+            ):
+        '''
+        Returns a new Data object with only the data corresponding to the times
+        between start and end.
+        Start and end can either be floats corresponding to seconds elapsed
+        since self.start_time, or they can be datetime objects
+
+        :param start: The earliest time allowed
+        :param end: The latest time allowed
+        '''
+        if self.t_data_name not in self.data_names:
+            raise ValueError(
+                f'{type(self)} object does not contain time data.'
+            )
+        
+        # If start or end are datetime objects then convert them in to elapsed
+        # time
+        if type(start) == datetime.datetime:
+            start = self.convert_datetime_to_elapsed_time(start)
+        if type(end) == datetime.datetime:
+            end   = self.convert_datetime_to_elapsed_time(end)
+        
+        # Now use in_data_range method to extract data within the time range.
+        return self.in_data_range(self.t_data_name, start, end)
+    
     
     def data_key(self, d: str) -> str:
         '''
@@ -333,7 +378,8 @@ class Data:
         '''
         This function calculates the rolling average of the data_names provided.
 
-        :param data_names: The names of the data to calculate the rolling average for.
+        :param data_names: The names of the data to calculate the rolling
+            average for.
         :type data_names: str
         :keyword w: The window size for the rolling average, default is 1.
         :type w: int
