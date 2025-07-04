@@ -172,6 +172,17 @@ class ECLab_File(Data):
         for name in data_names: self.data[name] = []
         self.data_names = data_names
 
+    def line_to_string_values(self, line: str, delimeter: str) -> List[str]:
+        '''
+        Converts a line of data into a list of string values.
+        Also replaces commas with periods to ensure correct float conversion.
+
+        :param line: The line to be converted
+        :param delimeter: The delimeter used in the file
+        :return: A list of string values from the line
+        '''
+        return [x.replace(',', '.') for x in line.strip().split(delimeter)]
+
     def parse_elapsed_time_format(self, delimeter=''):
         '''
         Returns parser used when all values are reported as floats.
@@ -179,8 +190,8 @@ class ECLab_File(Data):
         :param delimeter: The delimeter used in the file
         '''
         def parse(line):
-            vals = line.strip().split(delimeter)
-            return [float(x) if x.strip() else np.nan for x in line.split(delimeter)]
+            vals = self.line_to_string_values(line, delimeter)
+            return [float(x) if x.strip() else np.nan for x in vals]
         return parse
     
     def parse_date_time_format(self, time_index: int,
@@ -192,7 +203,7 @@ class ECLab_File(Data):
         :param delimeter: The delimeter used in the file
         '''
         def parse(line):
-            vals = line.strip().split(delimeter)
+            vals = self.line_to_string_values(line, delimeter)
             date = vals[time_index]
             vals[time_index] = ''
             elapsed_time = self.convert_absolute_time_to_elapsed_time(date)
