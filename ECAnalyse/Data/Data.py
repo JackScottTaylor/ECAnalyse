@@ -1,31 +1,148 @@
 import datetime
 import numpy as np
+import warnings
 
-from typing import Union
+from typing import Union, List
+
+# Define a placeholder time such that the Data object can use start_time and
+# end_time if not defined by the user or by data.
+TIME_PLACEHOLDER = datetime.datetime(2000, 1, 21, 12, 0)
 
 class Data:
+    '''
+    This is a general class designed for holding data from an experiment.
+    Different file types will inherit from this class and implement their own
+    methods for reading data from files.
+
+    Data stored in data dictionary, where keys are data_names and the values are
+        numpy arrays containing the corresponding data.
+    Attribute aliases is a dictionary where the keys correspond to set
+        attributes and the values are the corresponding data_names. For example
+        file might store time under 'Absolute Time' but the user has set the 
+        common attribute 't' to refer to this data.
+    time_format is a string that describes how datetimes are formatted in the 
+        data that is read in, if it is included.
+    t_data_name is the data_name that corresponds to time data, if it exists.
+    start_time and end_time are the start and end times of the data which will
+        be set to the earliest and latest datetimes in the data. If there is no
+        time data or time data is only in elapsed time, then these are set to 
+        TIME_PLACEHOLDER.
+    data_type is a string that describes what class of data this is.
+    '''
     def __init__(self):
-        # This is the generic data object.
-        # The attributes below are generally more defined for individual child classes.
-        self.data = {}
-        self.data_names = []
-        self.attribute_aliases = {}
-        self.time_format = ''
-        self.t_data_name = ''
-        self.start_time, self.end_time = 0, 0
-        self.data_type = 'Data'
-        self.plot_params = {} # Dictionary used for storing plot parameters.
-        self.t_data_name = '' # If the data contains time data, set this to the correct data_name.
+        self.data:              dict               = {}
+        self.attribute_aliases: dict               = {}
+        self.time_format:       str                = ''
+        self.t_data_name:       str                = ''
+        self.start_time:        datetime.datetime  = TIME_PLACEHOLDER
+        self.end_time:          datetime.datetime  = TIME_PLACEHOLDER
+        self.data_type:         str                = 'Data'
+
+
+    @property
+    def data_names(self) -> List[str]:
+        '''
+        This property returns the keys of the data dictionary
+
+        :return: A list of data_names (keys of the data dictionary).
+        '''
+        return list(self.data.keys())
+
+
+    def set_start_time(
+        self,
+        start_time: datetime.datetime = TIME_PLACEHOLDER,
+        end_time_changes: bool = False,
+        ):
+        '''
+        This method sets the start_time of the Data object to the provided
+        datetime object. If end_time_changes it also changes the end_time
+        such as the value of end_time - start_time is conserved. If the
+        start_time provided is not datetime object then a ValueError is raised.
+        
+        :param start_time: The start time to set the Data object to
+        :param end_time_changes: If True, then the end_time is changed to
+            conserve the time difference between start_time and end_time.
+            If False, then the end_time is not changed.
+        '''
+        if type(start_time) != datetime.datetime:
+            raise ValueError(
+                f'Start time must be a datetime object, not {type(start_time)}.'
+            )
+        time_difference = self.end_time - self.start_time
+        self.start_time = start_time
+        if end_time_changes: self.end_time = self.start_time + time_difference
+
+    def set_end_time(
+        self,
+        end_time: datetime.datetime = TIME_PLACEHOLDER,
+        start_time_changes: bool = False,
+        ):
+        '''
+        This method sets the end_time of the Data object to the provided
+        datetime object. If start_time_changes it also changes the start_time
+        such as the value of end_time - start_time is conserved. If the
+        end_time provided is not datetime object then a ValueError is raised.
+        
+        :param end_time: The start time to set the Data object to
+        :param starttime_changes: If True, then the end_time is changed to
+            conserve the time difference between start_time and end_time.
+            If False, then the end_time is not changed.
+        '''
+        if type(end_time) != datetime.datetime:
+            raise ValueError(
+                f'End time must be a datetime object, not {type(end_time)}.'
+            )
+        time_difference = self.end_time - self.start_time
+        self.end_time = end_time
+        if start_time_changes: self.start_time = self.end_time - time_difference
 
 
     def __add__(self, other):
-        # This function is used to combine two Data objects.
-        # The two data objects should be of the same type.
-        # They must also have the same data_names.
-        # A new Data object of the same type is first created.
+        '''
+        This method allows for two Data objects to be combined using the +
+        operator. 
+
+        Both Data objects should be the same type.
+        '''
+        # Check that both objects are same type, if not then raise error.
+        if type(self) != type(other):
+            raise TypeError(
+                f'Cannot combine {type(self)} and {type(other)} objects. '
+                'Both objects must be of the same type.'
+            )
+        # Initialise new object of the same type as self.
         combined_data = type(self)()
-        combined_data.data_names = self.data_names
+
+        # Check that both objects have the same data_names, if not raise error.
+        if set(self.data_names) != set(other.data_names):
+            raise ValueError(
+                f'Cannot combine {type(self)} and {type(other)} objects. '
+                'Both objects must have the same data_names.'
+            )
+
+        # The start_time of the new object is set to the earliest start_time of
+        # the two objects. If start_time for exactly one is TIME_PLACEHOLDER,
+        # then raise warning as this is likely an error.
+        if [self.start_time, other.start_time].count(TIME_PLACEHOLDER) == 1:
+            warnings.warn(
+                f'One of the passed objects ({type(self)} or {type(other)}) ' +
+                f'has a start_time set to the placeholder value while the ' +
+                f'other does not. Time combination is therfore likelky wrong.'
+            )
+
+        # Set the start and end times of the new object based on the self and 
+        # other objects.
+        combined_data.set_start_time(
+            start_time = min(self.start_time, other.start_time),
+            end_time_changes = False
+        )
+        combined_data.set_end_time(
+            end_time = max(self.end_time, other.end_time),
+            start_time_changes = False
+        )
         
+
         # If both start_times are datetime objects then new_start_time is the earliest of the two.
         # If both start_times are floats or integers then new_start_time is the smallest of the two.
         if type(self.start_time) == type(other.start_time):
