@@ -18,19 +18,31 @@ def sample_data():
 def test_data_names(sample_data):
     assert set(sample_data.data_names) == {'Time', 'Signal'}
 
-def test_set_start_time_and_shift_end_time(sample_data):
+def test_set_start_time_and_set_end_time(sample_data):
     original_duration = sample_data.end_time - sample_data.start_time
     new_start = datetime.datetime(2025, 1, 1, 12, 0)
+    old_elapsed_time = sample_data.data['Time'][4]
     sample_data.set_start_time(new_start)
     assert sample_data.start_time == new_start
+    assert sample_data.data['Time'][4] == old_elapsed_time
     assert sample_data.end_time - sample_data.start_time == original_duration
 
-def test_set_end_time_and_shift_start_time(sample_data):
+def test_set_end_time_and_set_start_time(sample_data):
     original_duration = sample_data.end_time - sample_data.start_time
     new_end = datetime.datetime(2026, 1, 1, 12, 0)
+    old_elapsed_time = sample_data.data['Time'][4]
     sample_data.set_end_time(new_end)
     assert sample_data.end_time == new_end
+    assert sample_data.data['Time'][4] == old_elapsed_time
     assert sample_data.end_time - sample_data.start_time == original_duration
+
+def test_shift_start_time(sample_data):
+    original_start = sample_data.start_time
+    delta = datetime.timedelta(seconds=5)
+    old_time = sample_data.data['Time'].copy()
+    sample_data.shift_start_time(original_start + delta)
+    assert sample_data.start_time == original_start + delta
+    assert np.all(sample_data.data['Time'] == old_time -5)
 
 def test_in_data_range(sample_data):
     filtered = sample_data.in_data_range('Signal', -0.5, 0.5)

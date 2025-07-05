@@ -87,8 +87,7 @@ class Data:
         ):
         '''
         This method sets the start_time of the Data object to the provided
-        datetime object. If end_time_changes it also changes the end_time
-        such as the value of end_time - start_time is conserved. If the
+        datetime object. It does not change the elapsed time values. If the
         start_time provided is not datetime object then a ValueError is raised.
         
         :param start_time: The start time to set the Data object to
@@ -98,6 +97,32 @@ class Data:
                 f'Start time must be a datetime object, not {type(start_time)}.'
             )
         self.start_time = start_time
+
+
+    def shift_start_time(
+            self,
+            new_start_time: datetime.datetime
+            ):
+        '''
+        This method sets the start_time of the Data object to the provided 
+        datetime object. It also shifts the elapsed time values such that 
+        calling self.zero_time() would undo this action.
+
+        :param new_start_time: The new start time to set the Data object to
+        '''
+        if type(new_start_time) != datetime.datetime:
+            raise ValueError(
+                f'New start time must be a datetime object, not '
+                f'{type(new_start_time)}.'
+            )
+        # Calculate the time difference between the new and old start times
+        delta_t_seconds = (new_start_time - self.start_time).total_seconds()
+        # Set the new start time
+        self.set_start_time(start_time=new_start_time)
+        # Shift the elpased time values by the difference
+        if self.t_data_name in self.data_names:
+            self.data[self.t_data_name] -= delta_t_seconds
+
 
     def set_end_time(
         self,
