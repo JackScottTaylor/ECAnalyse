@@ -1,80 +1,74 @@
 '''
-This module contains child classes of the Data class which are used to read specific file types.
-The Data class is a generic data object which is used to store data from different file types.
+This module contains the ECLab_File class which inherits from Data and is used
+for loading in data from ECLab files formatted as either .txt or .csv
 '''
+
+from ..Data import Data
 
 import numpy as np
 import datetime
-from ..Data import Data
 
-from typing import List, Callable
+from typing import List, Callable, Union
 
 class ECLab_File(Data):
     '''
-    Description:
-    This class is used to read data from an ECLab txt file.
+    ECLab_File class for reading and processing data from ECLab files.
 
-    Parent Class:
-    Data
+    :param filepath: The path to the ECLab file to be read. This is optional
+        such that an empty ECLab_File object can be created which is important
+        for combining or splitting data later on.
     '''
-    def __init__(self, *file_name):
-        '''
-        Arguments:
-        - *file_name: str (optional)
-            The path of the file to be read
-
-        Methodology:
-        - self.data_type is set to 'ECLab_File'.
-        - Data is extracted from the file, stored in self.data, and the
-            data_names are stored in self.data_names.
-        - The start and end times are set.
-        - The commonly accessed attributes are set.
-        '''
+    def __init__(self, filepath=None):
+        # Initialise the parent Data class
         Data.__init__(self)
+        # Set the attributes specific to ECLab files
         self.time_format = "%m/%d/%Y %H:%M:%S.%f"
         self.data_type = 'ECLab_File'
         self.t_data_name = 'time/s'
 
-        if file_name: self.extract_data(file_name[0])
+        # If file_name provied then extract the data from the file.
+        if filepath: self.extract_data(filepath)
+        # Set the common attributes for ECLab files.
         self.set_commonly_accessed_attributes()
+
 
     def set_commonly_accessed_attributes(self):
         '''
-        Description:
-        INTERNAL FUNCTION CALLED DURING INITIALIZATION.
         For an ECLab file, the commonly accessed attributes are time/s, Ewe/V,
-        I/mA and cycle number.
-        The data for these is stored in the attributes t, E, I and c respectively.
+        I/mA cycle number and pressure.
+        Data for these is stored in the attributes t, E, I, c and P respectively
         '''
         self.set_attributes(
             ['time/s',  'Ewe/V',    'I/mA', 'cycle number', 'Pressure/bar (on Analog In1)'],
             ['t',       'E',        'I',    'c',            'P']
         )
 
-    def extract_data(self, file_path: str):
+
+    def extract_data(self, filepath: str):
         '''
         Internally called function used to extract the data from either a .txt
         or .csv formatted file.
 
-        :param file_path: The path to the ecported data file
+        :param filepath: The path to the ecported data file
         '''
-        if    file_path.endswith('.txt'): self.extract_from_txt(file_path)
-        elif  file_path.endswith('.csv'): self.extract_from_csv(file_path)
+        if    filepath.endswith('.txt'): self.extract_from_txt(filepath)
+        elif  filepath.endswith('.csv'): self.extract_from_csv(filepath)
         else: raise Exception("File must be .txt or .csv")
 
-    def extract_from_txt(self, file_path: str):
+
+    def extract_from_txt(self, filepath: str):
         '''
-        Internally called function used to extract data from a .csv formatted 
+        Internally called function used to extract data from a .txt formatted 
         ECLab data file. 
 
-        :param file_path: The path to the .txt formatted ECLab data file
+        :param filepath: The path to the .txt formatted ECLab data file
         '''
         # The first line contains some mus and therefore is encoded with latin1
         # instead of the usual UTF-8
-        with open(file_path, encoding='latin1') as file:
-            # First read the data_names form the first line of the txt file.
+        with open(filepath, encoding='latin1') as file:
+            # First read the data_names from the first line of the txt file.
             # The line ends in a newline character, so last element not counted
-            # as data_name
+            # as data_name. Then initialise the data dictionary.
             data_names = file.readline().split('\t')[:-1]
             self.initialise_data_dict(data_names)
 
@@ -82,11 +76,22 @@ class ECLab_File(Data):
             # format. Here we determine from the first line the time format
             # and choose the correct extraction method accordingly.
             parser = self.parse_elapsed_time_format(delimeter='\t')
-            time_data_found = 'time/s' in data_names
+            time_data_found = self.t_data_name in data_names
+            elapsed_time = True
             if time_data_found:
-                time_index = data_names.index('time/s')
+                time_index = data_names.index(self.t_data_name)
                 line = file.readline()
+                # If : in line then indicates time is in date format.
                 if ':' in line.split('\t')[time_index]:
+                    start_time_date = line.split('\t')[time_index]
+                    # Convert the date to eapsed time so can then covert to a 
+                    # datetime object and then set that as the start_time.
+                    start_time = self.convert_elapsed_time_to_datetime(
+                        self.convert_absolute_time_to_elapsed_time(
+                        start_time_date
+                    ))
+                    self.set_start_time(start_time)
+                    elapsed_time = False
                     parser = self.parse_date_time_format(time_index,
                                                          delimeter='\t')
                 self.record_data(line, parser)
@@ -95,25 +100,24 @@ class ECLab_File(Data):
             for line in file:
                 self.record_data(line, parser)
                 
-            # Convert in to numpy arrays
-            for data_name in self.data_names:
-                self.data[data_name] = np.array(self.data[data_name])
+        # Convert in to numpy arrays
+        for data_name in self.data_names:
+            self.data[data_name] = np.array(self.data[data_name])
 
-        # Finally set the end_time, assuming that 'time/s' has been recorded.
-        if time_data_found:
-            end_time = self.data['time/s'][-1]
-            self.end_time = self.convert_elapsed_time_to_datetime(end_time)
+        # If the time is in date format, then zero the time
+        if time_data_found and not elapsed_time: self.zero_time()
 
-    def extract_from_csv(self, file_path: str):
+
+    def extract_from_csv(self, filepath: str):
         '''
-        Internally called function used to extract data from a .txt formatted 
+        Internally called function used to extract data from a .csv formatted 
         ECLab data file. 
 
-        :param file_path: The path to the .csv formatted ECLab data file
+        :param filepath: The path to the .csv formatted ECLab data file
         '''
         # The first line contains some mus and therefore is encoded with latin1
         # instead of the usual UTF-8
-        with open(file_path, encoding='latin1') as file:
+        with open(filepath, encoding='latin1') as file:
             # For csv files the first line is formatted
             # "Technique started on : ";03/21/2025 04:33:06.786
             # Calling convert_absolute_time_to_alapsed_time set this as the 
@@ -121,22 +125,27 @@ class ECLab_File(Data):
             start_time = file.readline().split(';')[-1]
             # Pad to make sure correct number of decimal points
             date_part, ms_part = start_time.split('.')
+            # Assign to start_time and end_time
             start_time = f"{date_part}.{ms_part.strip().ljust(6, '0')}"
-            self.convert_absolute_time_to_elapsed_time(start_time)
+            start_time = self.convert_absolute_time_to_elapsed_time(start_time)
+            start_time = self.convert_elapsed_time_to_datetime(start_time)
+            self.set_start_time(start_time)
 
             # The data names are on the next line separated by semicolons
             data_names = file.readline().split(';')
+            # Remove quotation marks
+            data_names = [x.replace('"', '').strip() for x in data_names]
             self.initialise_data_dict(data_names)
 
             # Time can either be reported as elapsed time or in absolute date
             # format. Here we determine from the first line the time format
             # and choose the correct extraction method accordingly.
             parser = self.parse_elapsed_time_format(delimeter=';')
-            time_data_found = 'time/s' in data_names
+            time_data_found = self.t_data_name in data_names
             if time_data_found:
-                time_index = data_names.index('time/s')
+                time_index = data_names.index(self.t_data_name)
                 line = file.readline()
-                if ':' in line.split('\t')[time_index]:
+                if ':' in line.split(';')[time_index]:
                     parser = self.parse_date_time_format(time_index,
                                                          delimeter=';')
                 self.record_data(line, parser)
@@ -149,12 +158,14 @@ class ECLab_File(Data):
         for data_name in self.data_names:
             self.data[data_name] = np.array(self.data[data_name])
 
-        # Finally set the end_time, assuming that 'time/s' has been recorded.
-        if 'time/s' in self.data_names:
-            # Ensure the time starts from 0
-            self.data['time/s'] = self.data['time/s'] - self.data['time/s'][0]
-            end_time = self.data['time/s'][-1]
-            self.end_time = self.convert_elapsed_time_to_datetime(end_time)
+        # In the .csv files the start_time at the top of the file is start
+        # time of the technique in the file but the time data is in elapsed
+        # time from the start of the experiment. We would like start_time 
+        # to correspond to start of the technique, so we zero the time but
+        # don't change the start_time.
+        if time_data_found:
+            self.data[self.t_data_name] -= self.data[self.t_data_name][0]
+
 
     def initialise_data_dict(self, data_names: List[str]):
         '''
@@ -170,26 +181,38 @@ class ECLab_File(Data):
         data_names = [x.rstrip()          for x in data_names]
         # Create empty list in self.data for each data name
         for name in data_names: self.data[name] = []
-        self.data_names = data_names
 
-    def parse_elapsed_time_format(self, delimeter=''):
+
+    def parse_elapsed_time_format(
+            self,
+            delimeter: str = '',
+            ) -> Callable[[str], List[float]]:
         '''
         Returns parser used when all values are reported as floats.
 
         :param delimeter: The delimeter used in the file
+        :return: A function that takes a line of text and returns a list of 
+                 floats, with empty values replaced by NaN.
         '''
         def parse(line):
             vals = line.strip().split(delimeter)
-            return [float(x) if x.strip() else np.nan for x in line.split(delimeter)]
+            return [float(x) if x.strip() else np.nan for x in vals]
         return parse
     
-    def parse_date_time_format(self, time_index: int,
-                               delimeter: str = ''):
+
+    def parse_date_time_format(
+            self,
+            time_index: int,
+            delimeter:  str = ''
+            ) -> Callable[[str], List[float]]:
         '''
-        Returns parser used when the time is reported as an absolute date.
+        Returns parser used when the time is reported in date format.
 
         :param time_index: The index of the data column containing time data
         :param delimeter: The delimeter used in the file
+        :return: A function that takes a line of text and returns a list of 
+                 floats, with empty values replaced by NaN. Time is converted
+                 to elapsed time.
         '''
         def parse(line):
             vals = line.strip().split(delimeter)
@@ -201,6 +224,7 @@ class ECLab_File(Data):
             return parsed
         return parse
     
+
     def record_data(self, line: str, parser: Callable[[str], List[float]]):
         '''
         Parses a line and adds the relevant data to the corresponding list in 
@@ -213,39 +237,60 @@ class ECLab_File(Data):
         for data_name, val in zip(self.data_names, vals):
             self.data[data_name].append(val)
 
-    def cycle(self, c):
-        '''
-        Arguments:
-        - c: int or float
-            The cycle number to be extracted.
 
-        Returns:
-        - ECLab_File object
-            The ECLab_File object containing only the data from the specified cycle.
+    def cycle(self, c: Union[int, float]) -> 'ECLab_File':
         '''
+        Method to return ECLab_File object containing only the data from a 
+        specific cycle. If cycle data not found then raise error.
+
+        :param c: The desired cycle number
+        :return: ECLab_File object containing only specified cycle.
+        '''
+        if not isinstance(c, (int, float)):
+            raise TypeError(
+                f'Cycle number must be an int or float, not {type(c)}.'
+            )
+        if not hasattr(self, 'c'):
+            raise AttributeError(
+                'Cycle number data not found in ECLab_File. '
+                'Please check the file format.'
+            )
         c = float(c)
         return self.in_data_range('c', c, c)
 
 
-    def cycles(self, *cycles):
+    def cycles(self, *cycles: Union[int, float]) -> 'ECLab_File':
         ''' 
-        Arguments:
-        - *cycles: int or float
-            The cycle numbers to be extracted.
+        Returns ECLab_File containing data from the specified cycles.
 
-        Returns:
-        - ECLab_File object
-            The ECLab_File object containing only the data from the specified cycles.
+        :param cycles: A variable number of cycle numbers to be included in the
+            returned ECLab_File object.
+        :return: ECLab_File object containing data from the specified cycles.
         '''
+        if not hasattr(self, 'c'):
+            raise AttributeError(
+                'Cycle number data not found in ECLab_File. '
+                'Please check the file format.'
+            )
+        
         cycles_list = list(cycles)
         if not cycles_list:
             raise ValueError(
                 'No cycles provided. Please provide at least one cycle number.'
             )
-        # If cycles are provided then the data is extracted for each cycle and combined.
-        cycles_file = ECLab_File()
-        cycles_file.data_names = self.data_names
-        for data_name in self.data_names: cycles_file.data[data_name] = np.array([])
+        
+        # Find the maximum cycle number in self
+        max_self_cycle = np.max(self.c)
+        # Go through the cycles_list and mod the cycle numbers so that -1 will
+        # correspond to the last cycle for example
+        cycles_list = [c % max_self_cycle for c in cycles_list]
+
+        # Initialise empty Data object same type as self
+        cycles_file = type(self)()
+        # Create empty data dictionary with the same data names as self
+        for data_name in self.data_names:
+            cycles_file.data[data_name] = np.array([])
+        # Go through the cycles_list in order and add the Data objects
         for c in cycles_list:
             cycles_file += self.cycle(c)
         

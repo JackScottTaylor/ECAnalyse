@@ -318,7 +318,7 @@ class Data:
             )
         delta_t = self.data[self.t_data_name][0]
         self.data[self.t_data_name] -= delta_t
-        self.start_time = self.start_time - datetime.timedelta(seconds=delta_t)
+        self.start_time = self.start_time + datetime.timedelta(seconds=delta_t)
 
     
     def in_time_range(
