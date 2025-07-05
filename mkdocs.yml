@@ -1,0 +1,45 @@
+site_name: ECAnalyse
+repo_url: https://github.com/JackScottTaylor/ECAnalyse
+repo_name: GitHub
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.instant
+    - content.code.copy
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+  palette:
+    scheme: default
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - API Reference:
+      - Data Class: reference/data.md
+  - Developer:
+      - Contributing: developer/contributing.md
+      - Extending: developer/extending.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]  # Update to your source folder
+          options:
+            show_source: false
+            docstring_style: numpy
+  - mkdocs-jupyter  # Optional, for rendering .ipynb
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.highlight
