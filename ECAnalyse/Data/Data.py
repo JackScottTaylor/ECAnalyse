@@ -61,6 +61,25 @@ class Data:
         :return: A list of data_names (keys of the data dictionary).
         '''
         return list(self.data.keys())
+    
+    @property
+    def end_time(self) -> datetime.datetime:
+        '''
+        This property returns the end_time of the Data object by adding the
+        last value in the time data (in seconds) to the start_time. If no time
+        data then it returns the start_time and a warning is raised.
+        
+        :return: The end_time of the Data object.
+        '''
+        if self.t_data_name not in self.data_names:
+            warnings.warn(
+                f'{type(self)} object does not contain time data. '
+                'Returning start_time as end_time.'
+            )
+            return self.start_time
+        return self.start_time + datetime.timedelta(
+            seconds=self.data[self.t_data_name][-1]
+        )
 
 
     def set_start_time(
@@ -321,7 +340,7 @@ class Data:
         self.data[self.t_data_name] -= delta_t
         self.start_time = self.start_time - datetime.timedelta(seconds=delta_t)
         self.end_time   = self.end_time   - datetime.timedelta(seconds=delta_t)
-        
+
     
     def in_time_range(
             self,
