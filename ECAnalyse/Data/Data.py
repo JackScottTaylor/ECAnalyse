@@ -35,7 +35,6 @@ class Data:
         self.time_format:       str                = ''
         self.t_data_name:       str                = ''
         self.start_time:        datetime.datetime  = TIME_PLACEHOLDER
-        self.end_time:          datetime.datetime  = TIME_PLACEHOLDER
         self.data_type:         str                = 'Data'
 
 
@@ -85,7 +84,6 @@ class Data:
     def set_start_time(
         self,
         start_time: datetime.datetime = TIME_PLACEHOLDER,
-        end_time_changes: bool = False,
         ):
         '''
         This method sets the start_time of the Data object to the provided
@@ -94,42 +92,32 @@ class Data:
         start_time provided is not datetime object then a ValueError is raised.
         
         :param start_time: The start time to set the Data object to
-        :param end_time_changes: If True, then the end_time is changed to
-            conserve the time difference between start_time and end_time.
-            If False, then the end_time is not changed.
         '''
         if type(start_time) != datetime.datetime:
             raise ValueError(
                 f'Start time must be a datetime object, not {type(start_time)}.'
             )
-        time_difference = self.end_time - self.start_time
         self.start_time = start_time
-        if end_time_changes: self.end_time = self.start_time + time_difference
 
     def set_end_time(
         self,
-        end_time: datetime.datetime = TIME_PLACEHOLDER,
-        start_time_changes: bool = False,
+        end_time: datetime.datetime = TIME_PLACEHOLDER
         ):
         '''
-        This method sets the end_time of the Data object to the provided
-        datetime object. If start_time_changes it also changes the start_time
-        such as the value of end_time - start_time is conserved. If the
-        end_time provided is not datetime object then a ValueError is raised.
+        end_time is a property which can not be set, so instead this method 
+        sets the start_time such that when called, self.end_time will yield
+        the desired value.
         
         :param end_time: The start time to set the Data object to
-        :param starttime_changes: If True, then the end_time is changed to
-            conserve the time difference between start_time and end_time.
-            If False, then the end_time is not changed.
         '''
         if type(end_time) != datetime.datetime:
             raise ValueError(
                 f'End time must be a datetime object, not {type(end_time)}.'
             )
-        time_difference = self.end_time - self.start_time
-        self.end_time = end_time
-        if start_time_changes: self.start_time = self.end_time - time_difference
-
+        time_difference = (end_time - self.end_time).total_seconds()
+        self.start_time = self.start_time + datetime.timedelta(
+                                                    seconds = time_difference
+                                                    )
 
     def __add__(self, other):
         '''
@@ -167,12 +155,7 @@ class Data:
         # Set the start and end times of the new object based on the self and 
         # other objects.
         combined_data.set_start_time(
-            start_time = min(self.start_time, other.start_time),
-            end_time_changes = False
-        )
-        combined_data.set_end_time(
-            end_time = max(self.end_time, other.end_time),
-            start_time_changes = False
+            start_time = min(self.start_time, other.start_time)
         )
         
         # At this point we know that both objects have the same data_names
@@ -318,9 +301,6 @@ class Data:
         if self.t_data_name in self.data_names:
             time_key = self.t_data_name
             new_data.start_time = self.start_time
-            new_data.end_time   = self.convert_elapsed_time_to_datetime(
-                                        new_data.data[time_key][-1]
-                                        )
         # Set the common attributes of the new_data object.
         new_data.set_commonly_accessed_attributes()
         return new_data
@@ -339,7 +319,6 @@ class Data:
         delta_t = self.data[self.t_data_name][0]
         self.data[self.t_data_name] -= delta_t
         self.start_time = self.start_time - datetime.timedelta(seconds=delta_t)
-        self.end_time   = self.end_time   - datetime.timedelta(seconds=delta_t)
 
     
     def in_time_range(

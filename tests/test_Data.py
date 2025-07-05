@@ -12,7 +12,6 @@ def sample_data():
     d.data = {'Time': t, 'Signal': s1}
     d.t_data_name = 'Time'
     d.start_time = datetime.datetime(2023, 1, 1, 0, 0)
-    d.end_time = d.start_time + datetime.timedelta(seconds=t[-1])
     d.time_format = "%Y-%m-%d %H:%M:%S"
     return d
 
@@ -22,14 +21,14 @@ def test_data_names(sample_data):
 def test_set_start_time_and_shift_end_time(sample_data):
     original_duration = sample_data.end_time - sample_data.start_time
     new_start = datetime.datetime(2025, 1, 1, 12, 0)
-    sample_data.set_start_time(new_start, end_time_changes=True)
+    sample_data.set_start_time(new_start)
     assert sample_data.start_time == new_start
     assert sample_data.end_time - sample_data.start_time == original_duration
 
 def test_set_end_time_and_shift_start_time(sample_data):
     original_duration = sample_data.end_time - sample_data.start_time
     new_end = datetime.datetime(2026, 1, 1, 12, 0)
-    sample_data.set_end_time(new_end, start_time_changes=True)
+    sample_data.set_end_time(new_end)
     assert sample_data.end_time == new_end
     assert sample_data.end_time - sample_data.start_time == original_duration
 
@@ -76,7 +75,6 @@ def test_addition_merges_data():
         d.data = {'Time': t, 'Signal': s}
         d.t_data_name = 'Time'
         d.start_time = datetime.datetime(2023, 1, 1, 0, 0)
-        d.end_time = d.start_time + datetime.timedelta(seconds=t[-1])
     d_combined = d1 + d2
     assert len(d_combined.data['Signal']) == 22
     assert len(d_combined.data['Time']) == 22
