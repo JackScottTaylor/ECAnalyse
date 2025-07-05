@@ -15,10 +15,11 @@ class Experiment:
     :type files: Data
     '''
     def __init__(self, *files: Data):
+        # Save all files in self.files and then sync their start times so that
+        # they all start at the same time.
         self.files = [file for file in files]
-        # Initialise the start_time as None, if it required then global start
-        # time can be calculated from the files.
         self.start_time: datetime.datetime = TIME_PLACEHOLDER
+        self.sync_times()
 
     def sync_times(self):
         '''
@@ -29,8 +30,7 @@ class Experiment:
         accordingly.
         '''
         # Go through all the files and find if they have a start_time set
-        start_times = []
-        for file in self.files: start_times.append(file.start_time)
+        start_times = [file.start_time for file in self.files]
 
         # If datetimes found, then set the start_time to the earliest one.
         if start_times: self.start_time = min(start_times)
