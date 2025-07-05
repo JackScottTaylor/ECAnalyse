@@ -15,13 +15,23 @@ class GCD(Experiment):
     raised.
     
     :param files: ECLab_Files corresponding to the GCD experiment
+    :param mass1: Mass of the first electrode in mg (default is 0.0)
+    :param mass2: Mass of the second electrode in mg (default is 0.0)
     '''
-    def __init__(self, *files: ECLab_File):
+    def __init__(
+            self,
+            *files: ECLab_File,
+            mass1: float = 0.0,
+            mass2: float = 0.0
+            ):
         super().__init__(*files)
         if not self.files_have_required_data():
             raise ValueError(
                 "All files must contain time, current and voltage data"
             )
+        self.mass1 = mass1 # Mass of the first electrode in mg
+        self.mass2 = mass2 # Mass of the second electrode in mg
+        
         
     def files_have_required_data(self) -> bool:
         '''
