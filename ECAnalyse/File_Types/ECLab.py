@@ -10,6 +10,8 @@ import datetime
 
 from typing import List, Callable, Union
 
+from scipy.integrate import cumulative_trapezoid
+
 class ECLab_File(Data):
     '''
     ECLab_File class for reading and processing data from ECLab files.
@@ -196,6 +198,7 @@ class ECLab_File(Data):
         '''
         def parse(line):
             vals = line.strip().split(delimeter)
+            vals = self.comma_decimal_to_point_decimal(vals)
             return [float(x) if x.strip() else np.nan for x in vals]
         return parse
     
@@ -216,6 +219,7 @@ class ECLab_File(Data):
         '''
         def parse(line):
             vals = line.strip().split(delimeter)
+            vals = self.comma_decimal_to_point_decimal(vals)
             date = vals[time_index]
             vals[time_index] = ''
             elapsed_time = self.convert_absolute_time_to_elapsed_time(date)
@@ -297,4 +301,58 @@ class ECLab_File(Data):
         # Set the common attributes of the new object.
         cycles_file.set_commonly_accessed_attributes()
         return cycles_file
+    
+
+    def calculate_cumulative_charge(self):
+        '''
+        Calculates the cumulative charge passed via integration of the current
+        against time using the trapezoidal rule. The results is stored in 
+        self.data['cumulative charge/C'] and under the attribute self.Q
+        '''
+        if not hasattr(self, 'I'):
+            raise AttributeError(
+                'To calculate cumulative charge, ECLab_File must contain ' \
+                'current data in mA under the attribute self.I'
+            )
+        if not hasattr(self, 't'):
+            raise AttributeError(
+                'To calculate cumulative charge, ECLab_File must contain ' \
+                'time data in seconds under the attribute self.t'
+            )
+        # Calculate the cumulative charge using the trapezoidal rule
+        self.data['cumulative charge/C'] = cumulative_trapezoid(
+            self.I, self.t, initial=0.0) / 1000 # Convert mAs to C
+        
+        # Set the attribute self.Q to the same data
+        self.Q = self.data['cumulative charge/C']
+
+
+    def calculate_power(self):
+        '''
+        Calculates power as the product of voltage and current. The results is
+        stored in self.data['power/W'] and under the attribute self.P
+        '''
+        if not hasattr(self, 'E'):
+            raise AttributeError(
+                'To calculate power, ECLab_File must contain voltage data in V ' \
+                'under the attribute self.E'
+            )
+        if not hasattr(self, 'I'):
+            raise AttributeError(
+                'To calculate power, ECLab_File must contain current data in mA ' \
+                'under the attribute self.I'
+            )
+        # Calculate power as voltage multiplied by current
+        self.data['power/W'] = (self.E * self.I) / 1000
+
+
+    def calculate_cumulative_energy(self):
+        '''
+        Calculates cumulative energy as the integral of power against time where
+        power is calculated as voltage multiplied by current
+        '''
+        pass
+
+        
+        
         

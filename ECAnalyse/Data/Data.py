@@ -489,4 +489,17 @@ class Data:
                 self.data[key], kernel, mode='valid'))
         return tuple(roll_av_data) if len(roll_av_data) > 1 else roll_av_data[0]
 
+    
+    def comma_decimal_to_point_decimal(self, values: List[str]) -> List[str]:
+        '''
+        Converts a string which has a comma as a decimal point to one with a 
+        point as a decimal point. Python can not convert a string to float if
+        it uses comma as the decimal point.
+        
+        :param value: The string to convert
+        :return: The string correctly formatted
+        '''
+        return [value.replace(',', '.') for value in values]
+
+
 

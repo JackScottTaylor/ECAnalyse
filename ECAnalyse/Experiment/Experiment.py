@@ -1,6 +1,8 @@
 '''
 This class is made to store functions and Data objects relevant for a specific
 experiment.
+
+Data objects of the same type are grouped together through the add operator.
 '''
 from ..Data import Data, TIME_PLACEHOLDER
 import datetime
