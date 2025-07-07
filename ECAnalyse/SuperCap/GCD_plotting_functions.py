@@ -101,3 +101,46 @@ class GCD_Plotting_Mixin:
         if title: ax.set_title(title)
         # Finally return the ax object
         return ax
+
+
+    def plot_capacitance_vs_E(
+        self,
+            ax: Optional[Axes] = None,
+            labels: Optional[List[str]] = None,
+            title: str = '',
+            rolling_average: bool = False,
+            window_size: int = 10,
+            **kwargs
+        ) -> Axes:
+        '''
+        This function plots the capacitance (cumulative charge per charge / 
+        discharge cycle) against the voltage for each file in the GCD exp
+
+        :param ax: matplotlib Axes object to plot on. If None then uses current
+            active Axes.
+        :param labels: List of labels for each file. If None then no labels.
+        :param title: Title for the plot
+        :param rolling_average: If True, applies a rolling average to the data
+        :param window_size: Size of the rolling average window if using
+        :param kwargs: Additional keyword arguments to pass to the plot
+        '''
+        if ax is None: ax = plt.gca()
+        if labels is None: labels = [''] * len(self.files)
+        if len(labels) != len(self.files):
+            raise ValueError(
+                "Number of labels must match number of files in the experiment"
+            )
+        # All files will be plotted in the same colour and default is black
+        if 'color' not in kwargs:
+            kwargs['color'] = 'black'
+        
+        sections = self.charge_discharge_sections()
+        for section in sections:
+            Q = section.cumulative_charge()
+            E = section.E
+            ax = rolling_average_plot(
+                ax, section, 'E', 'Q', rolling_average=rolling_average,
+                window_size=window_size, **kwargs
+            )
+
+

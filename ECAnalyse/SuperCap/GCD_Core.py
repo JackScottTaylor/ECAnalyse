@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional, List
 if TYPE_CHECKING:
     from ..File_Types import ECLab_File
     from matplotlib.axes import Axes
+    from ..Data import Data
 
 class GCD(Experiment):
     '''
@@ -31,7 +32,7 @@ class GCD(Experiment):
             )
         self.mass1 = mass1 # Mass of the first electrode in mg
         self.mass2 = mass2 # Mass of the second electrode in mg
-        
+
         
     def files_have_required_data(self) -> bool:
         '''
@@ -43,3 +44,17 @@ class GCD(Experiment):
             if not all(hasattr(file, attr) for attr in ['t', 'E', 'I']):
                 return False
         return True
+    
+    def charge_discharge_sections(self) -> List[Data]:
+        '''
+        Sploits the GCD data into sections when charging and discharging. 
+        Charging when current is positive and discharging when negative
+        
+        :return: List of Data objects containing the charge and discharge
+            section of each file in the experiment
+        '''
+        sections: List[Data] = []
+        for file in self.files:
+            sections += file.split_when_crossing_thresholds('I', 0.0)
+        return sections
+

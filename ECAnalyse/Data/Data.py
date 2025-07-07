@@ -295,18 +295,23 @@ class Data:
 
     def in_data_range(
             self,
-            data_name: str,
-            minimum:   float,
-            maximum:   float
-            ):
+            data_name:    str,
+            minimum:      float,
+            maximum:      float,
+            closed_left:  bool = True,
+            closed_right: bool = True
+            ) -> 'Data':
         '''
         Returns a new data object the same type as self containing only the data
-        where the data corresponding to data_name falls in the closed region of
-        [minimum, maximum]
+        where the data corresponding to data_name falls in the region of
+        [minimum, maximum].
 
         :param data_name: The data which to filter by
         :param minimum: The minimum value the data should take
         :param maximum: The maximum value the data should take
+        :param closed_left: If True then minimum is included in the range
+        :param closed_right: If True then maximum is included in the range
+        :return: A new Data object with only the data in the specified range
         '''
         # Find key for data_dict corresponding to data required. If not found
         # then error is raised by self.data_key method.
@@ -316,7 +321,14 @@ class Data:
         # Create a new blank object of the same type as self.
         new_data  = type(self)()
         # Find the indices where the inequalities are satisfied
-        data_mask = (data >= minimum) & (data <= maximum)
+        if closed_left and closed_right:
+            data_mask = (data >= minimum) & (data <= maximum)
+        elif closed_left and not closed_right:
+            data_mask = (data >= minimum) & (data < maximum)
+        elif not closed_left and closed_right:
+            data_mask = (data > minimum) & (data <= maximum)
+        else:
+            data_mask = (data > minimum) & (data < maximum)
         # Add only the correct data to the new data file
         for data_name in self.data_names:
             new_data.data[data_name] = self.data[data_name][data_mask]
@@ -395,6 +407,65 @@ class Data:
             f'{d} is not a data_name or common attribute of the Data object.'
         )
     
+
+    def split_when_crossing_thresholds(
+            self,
+            data_name: str,
+            *thresholds: float
+        ) -> List['Data']:
+        '''
+        This method takes a data_name of the Data object and whenever the data
+        crosses one of the thresholds provided it creates a new Data object.
+
+        :param data_name: The name of the data to split on
+        :return: List of data onjects where each object contains data between
+            two consecutive threshold crossings.
+        '''
+        # Get the key for the data_name provided
+        key = self.data_key(data_name)
+        # Now create new data key nemed _data_index so we can use in_data_range
+        # to extract the data once the threshold indices are known.
+        self.data['_data_index']     = np.arange(len(self.data[key]))
+        splitting_indices: List[int] = [0]
+        split_data: List['Data']     = []
+        splitting_data = self.data[key]
+        previous_value = splitting_data[0]
+
+        # Define function to determine which threshold region in
+        def threshold_region(value: float) -> int:
+            '''
+            Counts the number of thresholds the value is greater than or equal 
+            to and returns the count
+            '''
+            count = 0
+            for threshold in thresholds:
+                if value >= threshold:
+                    count += 1
+            return count
+        
+        for i, value in enumerate(splitting_data):
+            if i == 0: continue # Skip first value
+            # If threshold region changed then assign current index as first 
+            # index of the new data object
+            if threshold_region(value) != threshold_region(previous_value):
+                splitting_indices.append(i)
+            previous_value = value
+        # Add the last index + 1 to the splitting indices
+        splitting_indices.append(i+1)
+
+        # Now use each pair of indices to extract the correct data
+        # and append it to the split_data list.
+        for i, j in zip(splitting_indices[:-1], splitting_indices[1:]):
+            split_data.append(
+                self.in_data_range(
+                    '_data_index', i, j, closed_left=True, closed_right=False
+                )
+            )
+        # Remove the temporary _data_index key from the data dictionary
+        del self.data['_data_index']
+        return split_data
+
+
     def rolling_average(
             self, *data_names: str, w: int = 1
             ) -> Union[np.ndarray, tuple[np.ndarray, ...]]:
