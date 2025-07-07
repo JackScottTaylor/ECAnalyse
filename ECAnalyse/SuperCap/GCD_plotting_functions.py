@@ -8,6 +8,8 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from numpy import ndarray
 
+import warnings
+
 class GCD_Plotting_Mixin:
     '''
     Mixin class for GCD plotting functions
@@ -77,48 +79,7 @@ class GCD_Plotting_Mixin:
         ax.set_ylabel('Current / mA')
         if title: ax.set_title(title)
         # Finally return the ax object
-        return ax
-
-
-    def plot_capacitance_vs_E(
-        self,
-            ax: Optional[Axes] = None,
-            labels: Optional[List[str]] = None,
-            title: str = '',
-            rolling_average: bool = False,
-            window_size: int = 10,
-            **kwargs
-        ) -> Axes:
-        '''
-        This function plots the capacitance (cumulative charge per charge / 
-        discharge cycle) against the voltage for each file in the GCD exp
-
-        :param ax: matplotlib Axes object to plot on. If None then uses current
-            active Axes.
-        :param labels: List of labels for each file. If None then no labels.
-        :param title: Title for the plot
-        :param rolling_average: If True, applies a rolling average to the data
-        :param window_size: Size of the rolling average window if using
-        :param kwargs: Additional keyword arguments to pass to the plot
-        '''
-        if ax is None: ax = plt.gca()
-        if labels is None: labels = [''] * len(self.files)
-        if len(labels) != len(self.files):
-            raise ValueError(
-                "Number of labels must match number of files in the experiment"
-            )
-        # All files will be plotted in the same colour and default is black
-        if 'color' not in kwargs:
-            kwargs['color'] = 'black'
-        
-        sections = self.charge_discharge_sections()
-        for section in sections:
-            Q = section.cumulative_charge()
-            E = section.E
-            ax = rolling_average_plot(
-                ax, section, 'E', 'Q', rolling_average=rolling_average,
-                window_size=window_size, **kwargs
-            )
+        return ax        
 
 
     def plot_charging_regions(
@@ -157,7 +118,9 @@ class GCD_Plotting_Mixin:
             ['Charging', 'Discharging', 'Zero Current'],
             ['#DC267F', '#648FFF', 'black']
         ):
-            handles.append(plt.Line2D([0], [0], color=color, lw=2, label=parity))
+            handles.append(plt.Line2D(
+                                [0], [0], color=color, lw=2, label=parity
+                                    ))
         ax.legend(handles=handles, title='Charging Parity')
 
         return ax
@@ -184,10 +147,15 @@ class GCD_Plotting_Mixin:
             charging, discharging = cycle
             charging_i1, charging_i2 = charging[2], charging[3]
             discharging_i1, discharging_i2 = discharging[2], discharging[3]
+
             if discharging_i2 == len(self.t) - 1:
                 discharging_i2 = None
-            charging_t, charging_E = self.t[charging_i1:charging_i2], self.E[charging_i1:charging_i2]
-            discharging_t, discharging_E = self.t[discharging_i1:discharging_i2], self.E[discharging_i1:discharging_i2]
+
+            charging_t    = self.t[charging_i1:charging_i2]
+            charging_E    = self.E[charging_i1:charging_i2]
+            discharging_t = self.t[discharging_i1:discharging_i2]
+            discharging_E = self.E[discharging_i1:discharging_i2]
+            
             ax.plot(charging_t, charging_E, **kwargs)
             ax.plot(discharging_t, discharging_E, **kwargs)
 

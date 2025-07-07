@@ -375,8 +375,77 @@ class GCD(ECLab_File):
                     Q_discharging / Q_charging * 100.0
                 )
         return np.abs(efficiencies)
+    
+
+    def energy_efficiencies(self) -> np.ndarray:
+        '''
+        Calculates the charge-discharge cycle energy efficiencies using the 
+        detected charge-discharge cycles. The energy efficiency is defined as
+        discharged energy / charging energy, as a percentage.
+
+        :return: Numpy array of energy efficiencies for each cycle
+        '''
+        efficiencies = np.empty(len(self.detected_charge_discharge_cycles))
+        if not hasattr(self, 'energy'):
+            warnings.warn(
+                "Cumulative energy does not appear to be calculated. \n" \
+                "Now calculating using self.calculate_cumulative_energy().\n" \
+                "Best practice is to call this method prior to trying to \n" \
+                "calculate cycle efficiencies."
+            )
+            self.calculate_cumulative_energy()
+
+        for i, cycle in enumerate(self.detected_charge_discharge_cycles):
+            charging, discharging = cycle
+            charging_i1, charging_i2 = charging[2], charging[3]
+            discharging_i1, discharging_i2 = discharging[2], discharging[3]
+            if discharging_i2 == -1:
+                discharging_i2 = None
+
+            energy_charging = self.energy[charging_i2] - self.energy[charging_i1]
+            energy_discharging = self.energy[discharging_i2] - self.energy[discharging_i1]
+            if energy_charging == 0:
+                warnings.warn(
+                    f"Cycle {i} has zero charging energy. "
+                    "Energy efficiency will be set to NaN."
+                )
+                efficiencies[i] = np.nan
+            else:
+                efficiencies[i] = (
+                    energy_discharging / energy_charging * 100.0
+                )
+        return np.abs(efficiencies)
 
 
+    def resistances(self) -> np.ndarray:
+        '''
+        Calculates the resistance for each charge-discharge cycle using the 
+        ohmic drop method. R = ΔV / ΔI, where ΔV is the voltage drop and 
+        ΔI is the change in current. Voltage drop calculated as difference
+        last voltage in charge region and first voltage in discharge region.
+        ΔI is the change in current between the same two points.
+
+        :return: Numpy array of resistances for each cycle in Ohms
+        '''
+        resistances = np.empty(len(self.detected_charge_discharge_cycles))
+        for i, cycle in enumerate(self.detected_charge_discharge_cycles):
+            charging, discharging = cycle
+            charging_i1, charging_i2 = charging[2], charging[3]
+            discharging_i1, discharging_i2 = discharging[2], discharging[3]
+            if discharging_i2 == -1:
+                discharging_i2 = None
+
+            delta_V = self.E[discharging_i1] - self.E[charging_i2]
+            delta_I = (self.I[discharging_i1] - self.I[charging_i2]) / 1000
+            if delta_I == 0:
+                warnings.warn(
+                    f"Cycle {i} has zero change in current. "
+                    "Resistance will be set to NaN."
+                )
+                resistances[i] = np.nan
+            else:
+                resistances[i] = np.abs(delta_V / delta_I)
+        return resistances
             
 
             

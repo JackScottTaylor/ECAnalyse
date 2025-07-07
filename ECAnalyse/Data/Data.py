@@ -228,6 +228,7 @@ class Data:
         :param time: String representing date in format of self.date_format
         :return: Time between self.start_time and given time in seconds
         '''
+        time = time.strip()
         datetime_object = datetime.datetime.strptime(time, self.time_format)
         return self.convert_datetime_to_elapsed_time(datetime_object)
     

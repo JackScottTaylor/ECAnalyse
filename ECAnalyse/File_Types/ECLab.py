@@ -221,6 +221,9 @@ class ECLab_File(Data):
             vals = line.strip().split(delimeter)
             vals = self.comma_decimal_to_point_decimal(vals)
             date = vals[time_index]
+            date1, date2 = date.split('.')
+            date2 = date2 + '0' * (6 - len(date2))  # Pad to 6 digits
+            date = f"{date1}.{date2}"
             vals[time_index] = ''
             elapsed_time = self.convert_absolute_time_to_elapsed_time(date)
             parsed = [float(x) if x.strip() else np.nan for x in vals]
@@ -344,14 +347,31 @@ class ECLab_File(Data):
             )
         # Calculate power as voltage multiplied by current
         self.data['power/W'] = (self.E * self.I) / 1000
+        # Set the attribute self.P to the same data
+        self.P = self.data['power/W']
 
 
     def calculate_cumulative_energy(self):
         '''
         Calculates cumulative energy as the integral of power against time where
-        power is calculated as voltage multiplied by current
+        power is calculated as voltage multiplied by current. Results stored in 
+        self.data['cumulative energy/Wh'] and under the attribute self.energy
         '''
-        pass
+        if not hasattr(self, 'P'):
+            self.calculate_power()
+        
+        self.data['cumulative energy/Wh'] = cumulative_trapezoid(
+            self.P, self.t, initial=0.0) # In joules
+        # Convert to Wh
+        self.data['cumulative energy/Wh'] /= 3600
+        # Set the attribute self.Energy to the same data
+        self.energy = self.data['cumulative energy/Wh']
+
+        
+
+
+        
+        
 
         
         
