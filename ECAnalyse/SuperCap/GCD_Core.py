@@ -43,6 +43,7 @@ class GCD(ECLab_File):
         self.detected_current_regions_cache         = None
         self.detected_switch_regions_cache          = None
         self.detected_charge_discharge_cycles_cache = None
+        self.detected_voltage_hold_regions_cache    = None
 
 
     @property
@@ -111,6 +112,30 @@ class GCD(ECLab_File):
                 "------------------------WARNING------------------------\n")
             self.detect_charge_discharge_cycles()
         return self.detected_charge_discharge_cycles_cache
+    
+
+    @property
+    def detected_voltage_hold_regions(self) -> List[tuple]:
+        '''
+        Returns the detected voltage hold regions in the form of a list of 
+        tuples where each tuple has format:
+        (hold_value, start_index, end_index)
+
+        If the voltage hold regions have not yet been detected, detection
+        method is called and the regions are cached.
+
+        :return List of tuples with detected voltage hold regions
+        '''
+        if self.detected_voltage_hold_regions_cache is None:
+            print(
+                "------------------------WARNING------------------------\n"
+                "Voltage hold regions not yet detected. Detecting now with \n"
+                "default parameters (min_region_length=5, zero_threshold=0.001). \n"
+                "Best practice is to call self.detect_voltage_hold_regions() \n"
+                "before accessing this property.\n"
+                "------------------------WARNING------------------------\n")
+            self.detect_voltage_hold_regions()
+        return self.detected_voltage_hold_regions_cache
     
 
     def verify_required_data_present(self) -> None:
@@ -273,6 +298,52 @@ class GCD(ECLab_File):
                 current_parity, charging_parity,
                 sub_region_start, sub_region_end
             )
+
+
+    def detect_voltage_hold_regions(
+            self,
+            min_region_length: int = 5,
+            zero_threshold: float = 0.001
+            ):
+        '''
+        This method detects regions where the voltage is held constant.
+        This is quite a common addition to GCD experiments and it is
+        important to detect these in order to identify cycles correctly.
+
+        :param min_region_length: Minimum length of a region to be considered
+            valid. If a region is shorter than this, it will not be included in
+            the detected regions.
+        :param zero_threshold: Threshold for defining a region as a voltage hold.
+            If the voltage change is less than this threshold, then it is
+            considered a voltage hold region.
+        '''
+        self.detected_voltage_hold_regions_cache = []
+        n = len(self.t) - 1
+
+        def save_region_if_valid(hold_value, region_start, region_end):
+            if (region_end - region_start + 1) >= min_region_length:
+                if region_end == n:
+                    region_end = -1
+                self.detected_voltage_hold_regions_cache.append(
+                    (hold_value, region_start, region_end)
+                )
+
+        E               = self.E
+        hold_value      = E[0]
+        region_start    = 0
+        region_end      = 0
+        for i, value in enumerate(E):
+            if i == 0: continue
+            if abs(value - hold_value) < zero_threshold:
+                region_end = i
+            else:
+                save_region_if_valid(hold_value, region_start, region_end)
+                hold_value    = value
+                region_start  = i
+                region_end    = i
+
+        # Save the last region if valid
+        save_region_if_valid(hold_value, region_start, region_end)
 
 
     def detect_charge_discharge_cycles(self):
@@ -446,7 +517,36 @@ class GCD(ECLab_File):
             else:
                 resistances[i] = np.abs(delta_V / delta_I)
         return resistances
-            
+    
+
+    def instantaneous_capacitances(self) -> List[np.ndarray]:
+        '''
+        Calaculates the instantaneous capacitance for each point in the 
+        discharging sections of the GCD experiment.
+        Q = CV, take the time derivative and assume that the capacitance is not
+        a function of time, then dQ/dV = CdV/dt. 
+        dQ/dV is of course the current, such that C = I / dV/dt.
+        The voltage derivative is calculated as the average of the forward and
+        backwards gradient.
+        
+        :return: List of numpy arrays, each corresponding to the instantaneous 
+            capacitance for each discharging section of the GCD experiment.
+        '''
+        capacitances = []
+        for section in self.detected_charge_discharge_cycles:
+            charging, discharging = section
+            d_i1, d_i2 = discharging[2], discharging[3]
+            if d_i2 == -1:
+                d_i2 = None
+            # Calculate the voltage derivative
+            dVdt = np.gradient(self.E[d_i1:d_i2], self.t[d_i1:d_i2])
+            # Calculate the instantaneous capacitance
+            C = self.I[d_i1:d_i2] / dVdt
+            C /= 1000  # Convert from mA to A
+            # Append to the list
+            capacitances.append(C)
+        return capacitances
+        
 
             
 
