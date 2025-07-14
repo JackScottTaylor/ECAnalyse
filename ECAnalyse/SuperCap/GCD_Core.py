@@ -41,7 +41,7 @@ class GCD(ECLab_File):
         self.verify_required_data_present()
         # initialise the detected regions cache as None
         self.detected_current_regions_cache         = None
-        self.detected_switch_regions_cache          = None
+        self.detected_charging_regions_cache        = None
         self.detected_charge_discharge_cycles_cache = None
         self.detected_voltage_hold_regions_cache    = None
 
@@ -70,25 +70,25 @@ class GCD(ECLab_File):
     
 
     @property
-    def detected_switch_regions(self) -> List[tuple]:
+    def detected_charging_regions(self) -> List[tuple]:
         '''
-        Returns the detected switch regions in the form of a list of tuples
+        Returns the detected charging regions in the form of a list of tuples
         where each tuple has format:
         (current_region, charging_profile, start_index, end_index)
         If the current region is 'zero' then charging_profile is None.
 
         :return List of tuples with detected regions
         '''
-        if self.detected_switch_regions_cache is None:
+        if self.detected_charging_regions_cache is None:
             print(
                 "------------------------WARNING------------------------\n"
-                "Switch regions not yet detected. Detecting now with \n"
+                "charging regions not yet detected. Detecting now with \n"
                 "default parameters (min_region_length=5). \n"
-                "Best practice is to call self.detect_switch_regions() \n"
+                "Best practice is to call self.detect_charging_regions() \n"
                 "before accessing this property.\n"
                 "------------------------WARNING------------------------\n")
-            self.detect_switch_regions()
-        return self.detected_switch_regions_cache
+            self.detect_charging_regions()
+        return self.detected_charging_regions_cache
     
 
     @property
@@ -165,8 +165,9 @@ class GCD(ECLab_File):
         regions are accessed via the `detected_regions` property. They are
         stored as a list of tuples in the format: 
         (region_type, start_index, end_index) where region_type is one of
-        'positive', 'negative', or 'zero'. The start_index and end_index are the
-        indices of the first and last data points in the region, respectively.
+        'POSITVE_CURRENT', 'NEGATIVE_CURRENT', or 'ZERO_CURRENT'.
+        The start_index and end_index are the indices of the first and last data
+        points in the region, respectively.
         If end_index corresponds to last data point, then it is saved as -1.
     
         :param zero_threshold: Threshold for defining zero current region
@@ -178,11 +179,11 @@ class GCD(ECLab_File):
         n = len(I)
         def region(value):
             if value > zero_threshold:
-                return 'positive'
+                return 'POSITIVE_CURRENT'
             elif value < -zero_threshold:
-                return 'negative'
+                return 'NEGATIVE_CURRENT'
             else:
-                return 'zero'
+                return 'ZERO_CURRENT'
             
         current_region = region(I[0])
         region_start    = 0
@@ -210,99 +211,115 @@ class GCD(ECLab_File):
         save_region_if_valid(region_start, region_end)
 
 
-    def detect_switch_regions(
+    def detect_charging_regions(
             self,
-            min_region_length: int = 5
+            min_region_length: int = 5,
+            zero_threshold: float = 0.002
             ):
         '''
-        This method looks at the detected current regions and if the region is 
-        actuallya switching profile, then splits in to two regions, charging
-        and discharging. The switch happens when the voltage goes to zero.
-        When current is negative, voltage should be moving more negative,
-        therefore the first half would be discharging, and once the voltage
-        moves past zero, the supercapacitor is charging again.
+        This method looks at the detected current regions and voltage profile
+        to determine where the capacitor can be considered to be charging or
+        discharging.
+        Charging is defined as when the voltage is moving away from zero.
+        In this case if current is positive, then if voltage is positive then 
+        it is considered charging.
 
         :param min_region_length: Minimum length of a region to be considered
             valid. If a region is shorter than this, it will not be included in
             the detected regions.
+        :param zero_threshold: Threshold for defining a region as a switch. If
+            the voltage is between -zero_threshold and zero_threshold, then
+            it is treated as zero in terms of defining the parity.
         '''
-        self.detected_switch_regions_cache = []
+        self.detected_charging_regions_cache = []
         n = len(self.t) - 1
 
+        # Function which saves a region if it is determined a valid region.
         def save_region_if_valid(
-                current_parity,
-                charging_parity,
+                current_parity: str,
+                charging_parity: str,
                 region_start,
                 region_end
                 ):
+            # Don't save if zero voltage region
+            if charging_parity == 'ZERO_VOLTAGE': return
+            # Don't save if region is too short
             if (region_end - region_start + 1) >= min_region_length:
                 if region_end == n:
                     region_end = -1
-                self.detected_switch_regions_cache.append(
+                self.detected_charging_regions_cache.append(
                     (current_parity, charging_parity, region_start, region_end)
                 )
 
-        def parity(value):
-            if value > 0:
-                return 'positive'
-            elif value < 0:
-                return 'negative'
+        # Function to determine the parity of value based on the zero threshold
+        def voltage_parity(voltage: float) -> str:
+            if voltage >= zero_threshold:
+                return 'POSITIVE_VOLTAGE'
+            elif voltage <= -zero_threshold:
+                return 'NEGATIVE_VOLTAGE'
             else:
-                return 'zero'
+                return 'ZERO_VOLTAGE'
             
-        def E_to_charging_parity(E_parity, current_parity):
-            if current_parity == 'positive':
-                if E_parity == 'positive': return 'positive'
-                if E_parity == 'negative': return 'negative'
-            if current_parity == 'negative':
-                if E_parity == 'positive': return 'negative'
-                if E_parity == 'negative': return 'positive'
-            if current_parity == 'zero':
-                return 'Zero'
+        # Function to determine the charging parity based on current and voltage
+        def voltage_to_charging_parity(
+                voltage_parity: str,
+                current_parity: str
+                ) -> str:
+            if current_parity == 'POSITIVE_CURRENT':
+                if   voltage_parity == 'POSITIVE_VOLTAGE': return 'CHARGING'
+                elif voltage_parity == 'NEGATIVE_VOLTAGE': return 'DISCHARGING'
+                elif voltage_parity == 'ZERO_VOLTAGE':     return 'ZERO_VOLTAGE'
 
+            elif current_parity == 'NEGATIVE_CURRENT':
+                if voltage_parity   == 'POSITIVE_VOLTAGE': return 'DISCHARGING'
+                elif voltage_parity == 'NEGATIVE_VOLTAGE': return 'CHARGING'
+                elif voltage_parity == 'ZERO_VOLTAGE':     return 'ZERO_VOLTAGE'
 
+            elif current_parity == 'ZERO_CURRENT':         return 'ZERO_CURRENT'
+
+        # Loop through all of the detected current regions
         for region in self.detected_current_regions:
-            current_parity, start_index, end_index = region
-            if end_index == -1: end_index = n
-            if current_parity == 'zero':
-                save_region_if_valid(
-                    current_parity, 'zero', start_index, end_index
+                current_parity, start_index, end_index = region
+                # If current is zero, then we skip this current region
+                if current_parity == 'ZERO_CURRENT': continue
+                if end_index == -1: end_index = n
+
+                # If current is positive then we are charging initially
+                E_parity = voltage_parity(self.E[start_index])
+                sub_region_start = start_index
+                sub_region_end   = start_index
+
+                for i in range(start_index+1, end_index + 1):
+                    if voltage_parity(self.E[i]) != E_parity:
+                        # Calculate the charging parity
+                        charging_parity = voltage_to_charging_parity(
+                            E_parity, current_parity
+                        )
+                        # Save the region if valid
+                        save_region_if_valid(
+                            current_parity, charging_parity,
+                            sub_region_start, sub_region_end
+                        )
+                        # Update the sub-region start and end
+                        sub_region_start = i
+                        sub_region_end = i
+                        E_parity = voltage_parity(self.E[i])
+                    else:
+                        sub_region_end = i
+                
+                # Save the last sub-region if valid
+                charging_parity = voltage_to_charging_parity(
+                    E_parity, current_parity
                 )
-                continue
-            # If current is positive then we are charging initially
-            E_parity = parity(self.E[start_index])
-            sub_region_start = start_index
-            sub_region_end = start_index
-            for i in range(start_index+1, end_index + 1):
-                if parity(self.E[i]) != E_parity:
-                    # Calculate the charging parity
-                    charging_parity = E_to_charging_parity(
-                        E_parity, current_parity
-                    )
-                    # Save the region if valid
-                    save_region_if_valid(
-                        current_parity, charging_parity,
-                        sub_region_start, sub_region_end
-                    )
-                    sub_region_start = i
-                    sub_region_end = i
-                    E_parity = parity(self.E[i])
-                else:
-                    sub_region_end = i
-            
-            # Save the last sub-region if valid
-            charging_parity = E_to_charging_parity(
-                E_parity, current_parity
-            )
-            save_region_if_valid(
-                current_parity, charging_parity,
-                sub_region_start, sub_region_end
-            )
+                save_region_if_valid(
+                    current_parity, charging_parity,
+                    sub_region_start, sub_region_end
+                )
 
 
     def detect_voltage_hold_regions(
             self,
-            min_region_length: int = 5,
+            min_region_length: int = 25,
             zero_threshold: float = 0.001
             ):
         '''
@@ -335,7 +352,12 @@ class GCD(ECLab_File):
         for i, value in enumerate(E):
             if i == 0: continue
             if abs(value - hold_value) < zero_threshold:
+                # Update the end of the region
                 region_end = i
+
+                # Update the hold value to be the average of the region so far
+                hold_value = (hold_value * (region_end - region_start) + value) / \
+                             (region_end - region_start + 1)
             else:
                 save_region_if_valid(hold_value, region_start, region_end)
                 hold_value    = value
