@@ -4,6 +4,8 @@ from ..File_Types import ECLab_File
 import numpy as np
 import warnings
 
+from scipy.stats import linregress
+
 from typing import TYPE_CHECKING, Optional, List
 if TYPE_CHECKING:
     from ..File_Types import ECLab_File
@@ -346,13 +348,27 @@ class GCD(ECLab_File):
         self.detected_voltage_hold_regions_cache = []
         n = len(self.t) - 1
 
+        def zero_gradient(start, end, threshold_percent=0.25):
+            '''
+            Checks whether over the given region, the gradient is reasonably
+            close to zero.
+            '''
+            n_points = end - start + 1
+            max_gradient = 2 * zero_threshold / n_points
+            # Calculate the gradient over the region using linear regression
+            slope, intercept, r_value, p_value, std_err = linregress(
+                self.t[start:end], self.E[start:end]
+            )
+            if abs(slope) < max_gradient * threshold_percent: return True
+            return False
+
         def save_region_if_valid(hold_value, region_start, region_end):
-            if (region_end - region_start + 1) >= min_region_length:
-                if region_end == n:
-                    region_end = -1
-                self.detected_voltage_hold_regions_cache.append(
-                    (hold_value, region_start, region_end)
-                )
+            if (region_end - region_start + 1) <= min_region_length: return
+            if not zero_gradient(region_start, region_end): return
+            if region_end == n: region_end = -1
+            self.detected_voltage_hold_regions_cache.append(
+                (hold_value, region_start, region_end)
+            )
 
         E               = self.E
         hold_value      = E[0]
