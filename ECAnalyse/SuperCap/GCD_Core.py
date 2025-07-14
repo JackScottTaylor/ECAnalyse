@@ -20,6 +20,62 @@ therefore this class will be made a child of the ECLab_File class.
 It will be loaded directly from a filepath like other Data type objects.
 '''
 
+class Region:
+    '''
+    Basic class to hold information about type of region, start and end index.
+    '''
+    def __init__(self, parity: str, start_index: int, end_index: int):
+        self.type        = 'Region'
+        self.parity      = parity
+        self.start       = start_index
+        self.end         = end_index
+
+
+class Current_Region(Region):
+    '''
+    Class to hold information about a current region.
+    '''
+    def __init__(self, parity: str, start_index: int, end_index: int):
+        super().__init__(parity, start_index, end_index)
+        self.type = 'Current'
+
+
+class Charging_Region(Region):
+    '''
+    Class to hold information about a charging region.
+    '''
+    def __init__(self, parity: str, start_index: int, end_index: int):
+        super().__init__(parity, start_index, end_index)
+        self.type = 'Charging'
+
+
+class Voltage_Hold_Region(Region):
+    '''
+    Class to hold information about a voltage hold region.
+    '''
+    def __init__(self, hold_value: float, start_index: int, end_index: int):
+        super().__init__('HOLD', start_index, end_index)
+        self.hold_value = hold_value
+        self.type = 'Voltage Hold'
+
+
+class Charge_Discharge_Cycle:
+    '''
+    Class to hold information about a charge-discharge cycle.
+    '''
+    def __init__(self, regions: List[Region]):
+        self.start = regions[0].start
+        self.end   = regions[-1].end
+        self.regions = regions
+        self.discharging_region_index = 0
+        for i, region in enumerate(regions):
+            if region.parity == 'DISCHARGING':
+                self.discharging_region_index = i
+                break
+        self.charging = self.regions[0]
+        self.discharging = self.regions[self.discharging_region_index]
+        
+
 class GCD(ECLab_File):
     '''
     Class for holding GCD data and methods for analysing it.
@@ -196,7 +252,7 @@ class GCD(ECLab_File):
                 if region_end == n - 1:
                     region_end = -1
                 self.detected_current_regions_cache.append(
-                    (current_region, region_start, region_end)
+                    Current_Region(current_region, region_start, region_end)
                 )
 
         for i, value in enumerate(I):
@@ -250,7 +306,7 @@ class GCD(ECLab_File):
                 if region_end == n:
                     region_end = -1
                 self.detected_charging_regions_cache.append(
-                    (current_parity, charging_parity, region_start, region_end)
+                    Charging_Region(charging_parity, region_start, region_end)
                 )
 
         # Function to determine the parity of value based on the zero threshold
@@ -282,14 +338,16 @@ class GCD(ECLab_File):
         # Function to determine whether in a voltage hold or not
         def in_voltage_hold(index) -> bool:
             for hold in self.detected_voltage_hold_regions:
-                hold_value, start_index, end_index = hold
+                start_index, end_index = hold.start, hold.end
                 if end_index == -1: end_index = n
                 if start_index <= index <= end_index: return True
             return False
 
         # Loop through all of the detected current regions
         for region in self.detected_current_regions:
-                current_parity, start_index, end_index = region
+                current_parity = region.parity
+                start_index    = region.start
+                end_index      = region.end
                 # If current is zero, then we skip this current region
                 if current_parity == 'ZERO_CURRENT': continue
                 if end_index == -1: end_index = n
@@ -367,7 +425,7 @@ class GCD(ECLab_File):
             if not zero_gradient(region_start, region_end): return
             if region_end == n: region_end = -1
             self.detected_voltage_hold_regions_cache.append(
-                (hold_value, region_start, region_end)
+                Voltage_Hold_Region(hold_value, region_start, region_end)
             )
 
         E               = self.E
@@ -400,24 +458,66 @@ class GCD(ECLab_File):
         region, possibly with a zero region inbetween.
         '''
         self.detected_charge_discharge_cycles_cache = []
+        # Combine the charging and hold regions and sort by start time.
+        relevant_regions = self.detected_charging_regions + \
+                           self.detected_voltage_hold_regions
+        relevant_regions = sorted(relevant_regions, key=lambda x: x.start)
+
         unused_regions = []
         current_cycle = []
-        for region in self.detected_switch_regions:
-            _, charging_parity, i1, i2 = region
-            if len(current_cycle) == 0:
-                if charging_parity == 'positive':
+
+        charging_step_added    = False
+        discharging_step_added = False
+        for region in relevant_regions:
+            if type(region) == Voltage_Hold_Region:
+                if charging_step_added: current_cycle.append(region)
+                else: unused_regions.append(region)
+                continue
+            # Else we have a charging/discharging region
+            charging_parity = region.parity
+
+            if charging_parity == 'CHARGING':
+                if not charging_step_added:
                     current_cycle.append(region)
+                    charging_step_added = True
                 else:
+                    if discharging_step_added:
+                        # We have a new cycle, save the old one
+                        self.detected_charge_discharge_cycles_cache.append(
+                            Charge_Discharge_Cycle(current_cycle)
+                        )
+                        current_cycle = [region]
+                        charging_step_added = True
+                        discharging_step_added = False
+                    else:
+                        # Multiple charging steps, issue warning
+                        warnings.warn(
+                            "Multiple charging steps detected in a cycle. "
+                            "This is not expected and may indicate an issue "
+                            "with the data or detection method."
+                        )
+                        unused_regions.append(region)
+
+            elif charging_parity == 'DISCHARGING':
+                if not charging_step_added:
                     unused_regions.append(region)
-            
-            else:
-                if charging_parity == 'negative':
+                    continue
+                if not discharging_step_added:
                     current_cycle.append(region)
-                    self.detected_charge_discharge_cycles_cache.append(
-                        current_cycle)
-                    current_cycle = []
+                    discharging_step_added = True
                 else:
+                    # Multiple discharging steps, issue warning
+                    warnings.warn(
+                        "Multiple discharging steps detected in a cycle. "
+                        "This is not expected and may indicate an issue "
+                        "with the data or detection method."
+                    )
                     unused_regions.append(region)
+
+        # If end cycle is complete then save it
+        if charging_step_added and discharging_step_added:
+            self.detected_charge_discharge_cycles_cache.append(
+                Charge_Discharge_Cycle(current_cycle))
 
         print(
             f"Detected {len(self.detected_charge_discharge_cycles)} "
@@ -426,10 +526,12 @@ class GCD(ECLab_File):
         print(
             f"Detected {len(unused_regions)} unused regions that were not "
             f"part of a charge-discharge cycle. Of which there were" \
-            f" {len([r for r in unused_regions if r[1] == 'positive'])} " \
-            f"positive, " \
-            f"{len([r for r in unused_regions if r[1] == 'negative'])} negative, " \
-            f"and {len([r for r in unused_regions if r[1] == 'zero'])} zero."
+            f" {len([r for r in unused_regions if r.parity == 'CHARGING'])} " \
+            f"charging, " \
+            f"{len([r for r in unused_regions if r.parity == 'DISCHARGING'])} " \
+            f"discharging, and " \
+            f"{len([r for r in unused_regions if r.type == 'Voltage Hold'])} " \
+            "holds."
         )
 
     
@@ -443,15 +545,8 @@ class GCD(ECLab_File):
         '''
         cycle_times = np.empty(len(self.detected_charge_discharge_cycles))
         for i, cycle in enumerate(self.detected_charge_discharge_cycles):
-            charging, discharging = cycle
-            charging_i1, charging_i2 = charging[2], charging[3]
-            discharging_i1, discharging_i2 = discharging[2], discharging[3]
-            if discharging_i2 == -1:
-                discharging_i2 = None
-
-            cycle_times[i] = (
-                self.t[discharging_i2] + self.t[charging_i1]
-            ) / 2
+            start, end = cycle.start, cycle.end
+            cycle_times[i] = (self.t[start] + self.t[end]) / 2
         return np.abs(cycle_times)
 
 
@@ -474,14 +569,12 @@ class GCD(ECLab_File):
             self.calculate_cumulative_charge()
 
         for i, cycle in enumerate(self.detected_charge_discharge_cycles):
-            charging, discharging = cycle
-            charging_i1, charging_i2 = charging[2], charging[3]
-            discharging_i1, discharging_i2 = discharging[2], discharging[3]
-            if discharging_i2 == -1:
-                discharging_i2 = None
+            start, end = cycle.start, cycle.end
+            discharge_start = cycle.discharging.start
 
-            Q_charging = self.Q[charging_i2] - self.Q[charging_i1]
-            Q_discharging = self.Q[discharging_i2] - self.Q[discharging_i1]
+            Q_charging = self.Q[discharge_start] - self.Q[start]
+            Q_discharging = self.Q[end] - self.Q[discharge_start]
+            print(Q_charging, Q_discharging)
             if Q_charging == 0:
                 warnings.warn(
                     f"Cycle {i} has zero charging charge. "
@@ -514,14 +607,11 @@ class GCD(ECLab_File):
             self.calculate_cumulative_energy()
 
         for i, cycle in enumerate(self.detected_charge_discharge_cycles):
-            charging, discharging = cycle
-            charging_i1, charging_i2 = charging[2], charging[3]
-            discharging_i1, discharging_i2 = discharging[2], discharging[3]
-            if discharging_i2 == -1:
-                discharging_i2 = None
+            start, end = cycle.start, cycle.end
+            discharge_start = cycle.discharging.start
 
-            energy_charging = self.energy[charging_i2] - self.energy[charging_i1]
-            energy_discharging = self.energy[discharging_i2] - self.energy[discharging_i1]
+            energy_charging = self.energy[discharge_start] - self.energy[start]
+            energy_discharging = self.energy[end] - self.energy[discharge_start]
             if energy_charging == 0:
                 warnings.warn(
                     f"Cycle {i} has zero charging energy. "
@@ -547,14 +637,12 @@ class GCD(ECLab_File):
         '''
         resistances = np.empty(len(self.detected_charge_discharge_cycles))
         for i, cycle in enumerate(self.detected_charge_discharge_cycles):
-            charging, discharging = cycle
-            charging_i1, charging_i2 = charging[2], charging[3]
-            discharging_i1, discharging_i2 = discharging[2], discharging[3]
-            if discharging_i2 == -1:
-                discharging_i2 = None
+            cstart, end = cycle.start, cycle.end
+            discharge_start = cycle.discharging.start
 
-            delta_V = self.E[discharging_i1] - self.E[charging_i2]
-            delta_I = (self.I[discharging_i1] - self.I[charging_i2]) / 1000
+            delta_V = self.E[discharge_start] - self.E[discharge_start - 1]
+            delta_I = (self.I[discharge_start] - self.I[discharge_start -1])
+            delta_I /= 1000  # Convert from mA to A
             if delta_I == 0:
                 warnings.warn(
                     f"Cycle {i} has zero change in current. "
@@ -575,14 +663,15 @@ class GCD(ECLab_File):
         dQ/dV is of course the current, such that C = I / dV/dt.
         The voltage derivative is calculated as the average of the forward and
         backwards gradient.
+        Capacitance here is calculated in Farads
         
         :return: List of numpy arrays, each corresponding to the instantaneous 
             capacitance for each discharging section of the GCD experiment.
         '''
         capacitances = []
         for section in self.detected_charge_discharge_cycles:
-            charging, discharging = section
-            d_i1, d_i2 = discharging[2], discharging[3]
+            charging, discharging = section.charging, section.discharging
+            d_i1, d_i2 = discharging.start, discharging.end
             if d_i2 == -1:
                 d_i2 = None
             # Calculate the voltage derivative
@@ -594,6 +683,38 @@ class GCD(ECLab_File):
             capacitances.append(C)
         return capacitances
         
+    
+    def gravimetric_instantaneous_capacitances(self):
+        '''
+        
+        '''
+        capacitances = self.instantaneous_capacitances()
+        if self.mass1 == 0.0 and self.mass2 == 0.0:
+            raise ValueError(
+                "Cannot calculate gravimetric capacitance as both masses are "
+                "set to zero. Please set at least one mass to a non-zero "
+                "value."
+            )
+        total_mass = self.mass1 + self.mass2
+        g_capacitances = []
+        for capacitance in capacitances:
+            g_capacitance = capacitance / (total_mass / 1000)  # Convert mg to g
+            g_capacitance *= 4
+            g_capacitances.append(g_capacitance)
+        return g_capacitances
+    
+    def gravimetric_capacitances(self, over_last_percent = 0.75) -> np.ndarray:
+        '''
+        
+        '''
+        gi_capacitances = self.gravimetric_instantaneous_capacitances()
+        # Calculate the average capacitance for each cycle
+        avg_capacitances = []
+        for capacitance in gi_capacitances:
+            start = int(len(capacitance) * (1 - over_last_percent))
+            avg_capacitances.append(np.mean(capacitance[start:]))
+        return np.array(avg_capacitances)
+
 
             
 
