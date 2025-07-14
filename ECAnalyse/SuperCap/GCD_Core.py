@@ -277,6 +277,14 @@ class GCD(ECLab_File):
 
             elif current_parity == 'ZERO_CURRENT':         return 'ZERO_CURRENT'
 
+        # Function to determine whether in a voltage hold or not
+        def in_voltage_hold(index) -> bool:
+            for hold in self.detected_voltage_hold_regions:
+                hold_value, start_index, end_index = hold
+                if end_index == -1: end_index = n
+                if start_index <= index <= end_index: return True
+            return False
+
         # Loop through all of the detected current regions
         for region in self.detected_current_regions:
                 current_parity, start_index, end_index = region
@@ -290,7 +298,8 @@ class GCD(ECLab_File):
                 sub_region_end   = start_index
 
                 for i in range(start_index+1, end_index + 1):
-                    if voltage_parity(self.E[i]) != E_parity:
+                    new_voltage_parity = voltage_parity(self.E[i])
+                    if new_voltage_parity != E_parity or in_voltage_hold(i):
                         # Calculate the charging parity
                         charging_parity = voltage_to_charging_parity(
                             E_parity, current_parity
@@ -303,7 +312,7 @@ class GCD(ECLab_File):
                         # Update the sub-region start and end
                         sub_region_start = i
                         sub_region_end = i
-                        E_parity = voltage_parity(self.E[i])
+                        E_parity = new_voltage_parity
                     else:
                         sub_region_end = i
                 
