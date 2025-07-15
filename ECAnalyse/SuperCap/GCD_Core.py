@@ -574,7 +574,6 @@ class GCD(ECLab_File):
 
             Q_charging = self.Q[discharge_start] - self.Q[start]
             Q_discharging = self.Q[end] - self.Q[discharge_start]
-            print(Q_charging, Q_discharging)
             if Q_charging == 0:
                 warnings.warn(
                     f"Cycle {i} has zero charging charge. "
@@ -654,7 +653,8 @@ class GCD(ECLab_File):
         return resistances
     
 
-    def instantaneous_capacitances(self) -> List[np.ndarray]:
+    def instantaneous_capacitances(
+            self, roll_av_w: int = 10) -> List[np.ndarray]:
         '''
         Calaculates the instantaneous capacitance for each point in the 
         discharging sections of the GCD experiment.
@@ -675,9 +675,20 @@ class GCD(ECLab_File):
             if d_i2 == -1:
                 d_i2 = None
             # Calculate the voltage derivative
-            dVdt = np.gradient(self.E[d_i1:d_i2], self.t[d_i1:d_i2])
+            if roll_av_w > 1:
+                E = np.convolve(self.E[d_i1:d_i2], 
+                                 np.ones(roll_av_w) / roll_av_w, mode='valid')
+                t = np.convolve(self.t[d_i1:d_i2], 
+                                 np.ones(roll_av_w) / roll_av_w, mode='valid')
+                I = np.convolve(self.I[d_i1:d_i2],
+                                 np.ones(roll_av_w) / roll_av_w, mode='valid')
+            else: E, t, I = self.E[d_i1:d_i2], self.t[d_i1:d_i2], self.I[d_i1:d_i2]
+
+            dVdt = np.gradient(E, t)
+            smoothed_dVdt = dVdt.copy()
+            
             # Calculate the instantaneous capacitance
-            C = self.I[d_i1:d_i2] / dVdt
+            C = I / smoothed_dVdt
             C /= 1000  # Convert from mA to A
             # Append to the list
             capacitances.append(C)
@@ -703,7 +714,7 @@ class GCD(ECLab_File):
             g_capacitances.append(g_capacitance)
         return g_capacitances
     
-    def gravimetric_capacitances(self, over_last_percent = 0.75) -> np.ndarray:
+    def gravimetric_capacitances(self, over_last_percent = 0.5) -> np.ndarray:
         '''
         
         '''

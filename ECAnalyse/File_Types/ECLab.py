@@ -41,8 +41,8 @@ class ECLab_File(Data):
         Data for these is stored in the attributes t, E, I, c and P respectively
         '''
         self.set_attributes(
-            ['time/s',  'Ewe/V',    'I/mA', 'cycle number', 'Pressure/bar (on Analog In1)'],
-            ['t',       'E',        'I',    'c',            'P']
+            ['time/s', 'Ewe/V', 'Ecell/V', 'I/mA', 'cycle number', 'Pressure/bar (on Analog In1)'],
+            ['t',      'E',     'E',       'I',    'c',            'P']
         )
 
 

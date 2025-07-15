@@ -1,6 +1,6 @@
 from __future__ import annotations  # For type hinting self in class methods
 
-from ..custom_plt import plt, rolling_average_plot
+from ..custom_plt import plt, rolling_average_plot, fig_h, fig_w
 
 from typing import TYPE_CHECKING, Optional, List
 if TYPE_CHECKING:
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from numpy import ndarray
 
-import warnings
+import warnings, os
 
 class GCD_Plotting_Mixin:
     '''
@@ -164,6 +164,159 @@ class GCD_Plotting_Mixin:
         ax.set_ylabel('Voltage / V')
 
         return ax
+    
+    
+    def full_analysis(
+            self,
+            analysis_directory:                     str,
+            current_regions_zero_threshold:         float   = 0.1,
+            current_regions_min_region_length:      int     = 5,
+            voltage_hold_regions_zero_threshold:    float   = 0.001,
+            voltage_hold_regions_min_region_length: int     = 25,
+            charging_regions_zero_threshold:        float   = 0.02,
+            charging_regions_min_region_length:     int     = 5,
+            title:                                  str     = '',
+            fig_w:                                  float   = 2 * fig_w,
+            fig_h:                                  float   = fig_h,
+            ):
+        '''
+        This method performs all of the necessary analysis on the GCD experiment
+        and saves the results as pdf files in the specified directory. It also
+        saves the calculated results in a text file in the same directory.
+        '''
+        # Check that provided directory does not already exist.
+        '''if os.path.isdir(analysis_directory):
+            print('This directory already exists. To avoid overwriting data, ' \
+            'please choose a directory that ECAnalyse can create itself.')
+            return'''
+        os.makedirs(analysis_directory, exist_ok=True)
 
+        # Detect all of the regions in the GCD experiment
+        self.detect_current_regions(
+            zero_threshold=current_regions_zero_threshold,
+            min_region_length=current_regions_min_region_length
+        )
+        self.detect_voltage_hold_regions(
+            zero_threshold = voltage_hold_regions_zero_threshold,
+            min_region_length = voltage_hold_regions_min_region_length
+        )
+        self.detect_charging_regions(
+            zero_threshold = charging_regions_zero_threshold,
+            min_region_length = charging_regions_min_region_length
+        )
+        self.detect_charge_discharge_cycles()
 
+        # Calculate additional data fields
+        self.calculate_cumulative_charge()
+        self.calculate_power()
+        self.calculate_cumulative_energy()
+
+        # Calculate cycle specific data
+        times               = self.charge_discharge_cycle_times()
+        efficiencies        = self.Coulomb_efficiencies()
+        energy_efficiencies = self.energy_efficiencies()
+        resistances         = self.resistances()
+        capacitances        = self.gravimetric_capacitances()
+
+        # Write this data to a .txt file so that it remains accessible
+        analysis_txt_filename = os.path.join(analysis_directory,
+                                             'GCD_analysis.txt')
+        with open(analysis_txt_filename, 'w') as f:
+            f.write('Time / s\tCoulomb Efficiency / %\tEnergy Efficiency / %\t'
+                    'Resistance / Ohms\tGravimetric Capacitance / F/g\n')
+            for t, eff, energy_eff, res, cap in zip(
+                times, efficiencies, energy_efficiencies,
+                resistances, capacitances):
+                f.write(f"{t}\t{eff}\t{energy_eff}\t"
+                        f"{res}\t{cap}\n")
+                
+        # Create and save a plot which is just the voltage profile
+        fig, ax = plt.subplots()
+        self.plot(ax=ax, title=title)
+        fig.set_size_inches(fig_w, fig_h)
+        fig.savefig(os.path.join(analysis_directory, 'GCD.pdf'))
+
+        # Create and save a plot which is the voltage profile with current
+        # profile overlaid.
+        fig, ax = plt.subplots()
+        self.plot(ax=ax, title=title)
+        ax2 = ax.twinx()
+        self.plot_current(ax=ax2, color='#DC267F', alpha=0.5)
+        fig.set_size_inches(fig_w, fig_h)
+        fig.savefig(os.path.join(analysis_directory, 'GCD_with_current.pdf'))
+                
+        # Make a plot showing all of the charge-discharge cycles.
+        fig, ax = plt.subplots()
+        # Plot all of the data in the GCD experiment in a transparent black
+        self.plot(ax=ax, color='black', alpha=0.25)
+        for cycle in self.detected_charge_discharge_cycles:
+            start, end = cycle.start, cycle.end
+            if end == -1: end = None
+            ax.plot(self.t[start:end], self.E[start:end])
+        ax.set_title(title + ' Charge-Discharge Cycles', wrap=True)
+        fig.set_size_inches(fig_w, fig_h)
+        fig.savefig(os.path.join(analysis_directory, 'GCD_cycles.pdf'))
+
+        # Make and save a plot for all of the calculated data fields.
+        fig, ax = plt.subplots()
+        ax.plot(times, efficiencies, label='Coulomb Efficiency', linestyle='--',
+                marker='o')
+        ax.plot(times, energy_efficiencies, label='Energy Efficiency',
+                linestyle='--', marker='o')
+        ax.set_xlabel('Time / s')
+        ax.set_ylabel('Efficiency / %')
+        ax.legend()
+        ax.set_title(title + ' Efficiencies', wrap=True)
+        fig.set_size_inches(fig_w, fig_h)
+        fig.savefig(os.path.join(analysis_directory, 'GCD_efficiencies.pdf'))
+
+        # Make and save a plot for the resistances.
+        fig, ax = plt.subplots()
+        ax.plot(times, resistances, label='Resistance', linestyle='--',
+                marker='o')
+        ax.set_xlabel('Time / s')
+        ax.set_ylabel('Resistance / Ohms')
+        ax.set_title(title + ' Resistances', wrap=True)
+        fig.set_size_inches(fig_w, fig_h)
+        fig.savefig(os.path.join(analysis_directory, 'GCD_resistances.pdf'))
+
+        # Make and save a plot for the gravimetric capacitances.
+        fig, ax = plt.subplots()
+        ax.plot(times, capacitances, label='Gravimetric Capacitance',
+                linestyle='--', marker='o')
+        ax.set_xlabel('Time / s')
+        ax.set_ylabel('Gravimetric Capacitance / F/g')
+        ax.set_title(title + ' Gravimetric Capacitances', wrap=True)
+        fig.set_size_inches(fig_w, fig_h)
+        fig.savefig(os.path.join(analysis_directory, 'GCD_capacitances.pdf'))
+
+        fig.clear()
+
+        # Now make a figure with all of the data collated together and save it
+        ax1 = plt.subplot(411)
+        self.plot(ax=ax1)
+        ax1.set_xlabel('')
+
+        ax2 = plt.subplot(412, sharex=ax1)
+        ax2.plot(times, efficiencies, label='Coulomb Efficiency',
+                 linestyle='--')
+        ax2.plot(times, energy_efficiencies, label='Energy Efficiency',
+                 linestyle='--')
+        ax2.set_ylabel('Efficiency / %')
+        ax2.legend()
+
+        ax3 = plt.subplot(413, sharex=ax1)
+        ax3.plot(times, resistances, label='Resistance', linestyle='--')
+        ax3.set_ylabel('Resistance / Ohms')
+
+        ax4 = plt.subplot(414, sharex=ax1)
+        ax4.plot(times, capacitances, label='Gravimetric Capacitance',
+                 linestyle='--')
+        ax4.set_ylabel('Gravimetric Capacitance / F/g')
+        ax4.set_xlabel('Time / s')
+
+        fig = plt.gcf()
+        fig.set_size_inches(fig_w, fig_h * 4)
+        fig.suptitle(title + ' GCD Analysis', wrap=True)
+        fig.savefig(os.path.join(analysis_directory, 'GCD_analysis.pdf'))
 
