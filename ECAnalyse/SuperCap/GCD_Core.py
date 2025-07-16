@@ -654,7 +654,7 @@ class GCD(ECLab_File):
     
 
     def instantaneous_capacitances(
-            self, roll_av_w: int = 10) -> List[np.ndarray]:
+            self, window: int = 10) -> List[np.ndarray]:
         '''
         Calaculates the instantaneous capacitance for each point in the 
         discharging sections of the GCD experiment.
@@ -665,6 +665,7 @@ class GCD(ECLab_File):
         backwards gradient.
         Capacitance here is calculated in Farads
         
+        :param window: The window size over which linear regression is applied.
         :return: List of numpy arrays, each corresponding to the instantaneous 
             capacitance for each discharging section of the GCD experiment.
         '''
@@ -672,23 +673,39 @@ class GCD(ECLab_File):
         for section in self.detected_charge_discharge_cycles:
             charging, discharging = section.charging, section.discharging
             d_i1, d_i2 = discharging.start, discharging.end
-            if d_i2 == -1:
-                d_i2 = None
-            # Calculate the voltage derivative
-            if roll_av_w > 1:
-                E = np.convolve(self.E[d_i1:d_i2], 
-                                 np.ones(roll_av_w) / roll_av_w, mode='valid')
-                t = np.convolve(self.t[d_i1:d_i2], 
-                                 np.ones(roll_av_w) / roll_av_w, mode='valid')
-                I = np.convolve(self.I[d_i1:d_i2],
-                                 np.ones(roll_av_w) / roll_av_w, mode='valid')
-            else: E, t, I = self.E[d_i1:d_i2], self.t[d_i1:d_i2], self.I[d_i1:d_i2]
+            if d_i2 == -1: d_i2 = None
 
-            dVdt = np.gradient(E, t)
-            smoothed_dVdt = dVdt.copy()
-            
+            # Extract the time, voltage and current
+            t = self.t[d_i1:d_i2]
+            E = self.E[d_i1:d_i2]
+            I = self.I[d_i1:d_i2]
+
+            # Check if the window size is larger than the number of points
+            if window >= len(t):
+                warnings.warn(
+                    f"Window size is larger than the number of points in the "
+                    f"discharging section. Setting window to {(len(t)-1)}"
+                )
+                window = len(t) - 1
+
+            # Calculate gradients using linear regression over sliding window
+            # of size window.
+            dVdt_length = len(t) - window + 1
+            dVdt = np.zeros(dVdt_length)
+            for i in range(dVdt_length):
+                t_window = t[i:i+window]
+                E_window = E[i:i+window]
+                slope, intercept, r_value, p_value, std_err = linregress(
+                    t_window, E_window
+                )
+                dVdt[i] = slope
+
+            # Shorten the current array to match the dVdt length, correctly
+            # removing from both ends by taking rolling average over the window
+            I = np.convolve(I, np.ones(window)/window, mode='valid')
+
             # Calculate the instantaneous capacitance
-            C = I / smoothed_dVdt
+            C = I / dVdt
             C /= 1000  # Convert from mA to A
             # Append to the list
             capacitances.append(C)
@@ -714,7 +731,7 @@ class GCD(ECLab_File):
             g_capacitances.append(g_capacitance)
         return g_capacitances
     
-    def gravimetric_capacitances(self, over_last_percent = 0.5) -> np.ndarray:
+    def gravimetric_capacitances(self, over_last_percent = 0.25) -> np.ndarray:
         '''
         
         '''
