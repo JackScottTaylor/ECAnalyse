@@ -39,8 +39,7 @@ class CO2_File(Data):
         '''
         assert file_name.endswith('.txt'), "File must be a .txt file"
         # Set the self.data dictionary keys
-        self.data_names = ['time/s', 'CO2/%']
-        self.data = {name: [] for name in self.data_names}
+        self.data = {name: [] for name in ['time/s', 'CO2/%']}
 
         # Read the data from the file
         with open(file_name, 'r') as file:
@@ -57,8 +56,3 @@ class CO2_File(Data):
         # Convert data to numpy arrays
         self.data['time/s'] = np.array(self.data['time/s'])
         self.data['CO2/%']  = np.array(self.data['CO2/%'])
-
-        # Set the end time
-        self.end_time = self.convert_elapsed_time_to_datetime(
-            self.data['time/s'][-1]
-        )
