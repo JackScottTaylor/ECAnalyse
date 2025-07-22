@@ -661,8 +661,9 @@ class GCD(ECLab_File):
         Q = CV, take the time derivative and assume that the capacitance is not
         a function of time, then dQ/dV = CdV/dt. 
         dQ/dV is of course the current, such that C = I / dV/dt.
-        The voltage derivative is calculated as the average of the forward and
-        backwards gradient.
+        The derivative is calculated using linear regression over a sliding
+        window of size window. The current is taken as the average current over
+        the same window.
         Capacitance here is calculated in Farads
         
         :param window: The window size over which linear regression is applied.
@@ -675,12 +676,13 @@ class GCD(ECLab_File):
             d_i1, d_i2 = discharging.start, discharging.end
             if d_i2 == -1: d_i2 = None
 
-            # Extract the time, voltage and current
+            # Extract the time, voltage and current for the discharging section
             t = self.t[d_i1:d_i2]
             E = self.E[d_i1:d_i2]
             I = self.I[d_i1:d_i2]
 
-            # Check if the window size is larger than the number of points
+            # Check that the window size is larger than the number of points
+            # If not then issue a warning and reduce the window size.
             if window >= len(t):
                 warnings.warn(
                     f"Window size is larger than the number of points in the "
@@ -695,9 +697,7 @@ class GCD(ECLab_File):
             for i in range(dVdt_length):
                 t_window = t[i:i+window]
                 E_window = E[i:i+window]
-                slope, intercept, r_value, p_value, std_err = linregress(
-                    t_window, E_window
-                )
+                slope = linregress(t_window, E_window).slope
                 dVdt[i] = slope
 
             # Shorten the current array to match the dVdt length, correctly
@@ -705,16 +705,29 @@ class GCD(ECLab_File):
             I = np.convolve(I, np.ones(window)/window, mode='valid')
 
             # Calculate the instantaneous capacitance
+            I = I / 1000 # Convert from mA to A
             C = I / dVdt
-            C /= 1000  # Convert from mA to A
             # Append to the list
             capacitances.append(C)
         return capacitances
         
     
-    def gravimetric_instantaneous_capacitances(self):
+    def gravimetric_instantaneous_capacitances(
+            self, window: int = 10) -> List[np.ndarray]:
         '''
-        
+        This method calculates the gravimetric instantaneous capacitance for 
+        each discharging section of the GCD experiment.
+        The convention used here is that the supercap consists of two double-
+        layer capacitors in series. The two in-series capacitors are assumed to 
+        be equal, such that the total capacitance is given by: 
+        C_total = C_single / 2. The gravimetrric capacitance is then obtained 
+        by dividing the single-electrode capacitance by half the total mass.
+
+        :param window: The window size over which linear regression is applied 
+            to calculate the instantaneous capacitance.
+        :return: List of numpy arrays, each corresponding to the gravimetric 
+            instantaneous capacitance for each discharging section of the GCD
+            experiment. 
         '''
         capacitances = self.instantaneous_capacitances()
         if self.mass1 == 0.0 and self.mass2 == 0.0:
@@ -731,22 +744,126 @@ class GCD(ECLab_File):
             g_capacitances.append(g_capacitance)
         return g_capacitances
     
-    def gravimetric_capacitances(self, over_last_percent = 0.25) -> np.ndarray:
+
+    def cycle_capacitances_instantaneous_average(
+            self, window: int = 10, over_last: float = 0.25) -> np.ndarray:
         '''
-        
+        This method calculates the capacitance for each charge-discharge cycle
+        by taking the average of the instantaneous capacitance over the last
+        over_last portion of the discharge step.
+
+        :param window: The window size over which linear regression is applied 
+            to calculate the instantaneous capacitance.
+        :param over_last: The portion of the discharge step to average over,
+            expressed as a fraction of the total discharge step length.
+            For example, 0.25 means the last 25% of the discharge step.
+        :return: Numpy array of average capacitances for each charge-discharge
+            cycle, calculated as the average of the instantaneous capacitance
+            over the last over_last portion of the discharge step.
         '''
-        gi_capacitances = self.gravimetric_instantaneous_capacitances()
-        # Calculate the average capacitance for each cycle
+        capacitances = self.gravimetric_instantaneous_capacitances(window)
         avg_capacitances = []
-        for capacitance in gi_capacitances:
-            start = int(len(capacitance) * (1 - over_last_percent))
+        for capacitance in capacitances:
+            start = int(len(capacitance) * (1 - over_last))
             avg_capacitances.append(np.mean(capacitance[start:]))
         return np.array(avg_capacitances)
+    
 
+    def cycle_capacitances_linear_regression(
+            self, over_last: float = 0.25) -> np.ndarray:
+        '''
+        This method calculates the capacitance for each charge-discharge cycle
+        by performing linear regression on the voltage profile over the last
+        over_last portion of the discharge step. The capacitance is calculated
+        as the slope of the linear fit to the voltage profile.
 
+        :param over_last: The portion of the discharge step to average over,
+            expressed as a fraction of the total discharge step length.
+            For example, 0.25 means the last 25% of the discharge step.
+        :return: Numpy array of average capacitances for each charge-discharge
+            cycle, calculated as the slope of the linear fit to the voltage
+            profile over the last over_last portion of the discharge step.
+        '''
+        capacitances = []
+        for section in self.detected_charge_discharge_cycles:
+            charging, discharging = section.charging, section.discharging
+            d_i1, d_i2 = discharging.start, discharging.end
+            if d_i2 == -1: d_i2 = None
+
+            # Extract the time and voltage for the discharging section
+            t = self.t[d_i1:d_i2]
+            E = self.E[d_i1:d_i2]
+
+            # Calculate the start index for the last over_last portion
+            start_index = int(len(t) * (1 - over_last))
+            t_last = t[start_index:]
+            E_last = E[start_index:]
+
+            # Perform linear regression to get the slope (capacitance)
+            slope = linregress(t_last, E_last).slope
             
+            # Calculate the capacitance as I / dV/dt
+            I_avg = np.mean(self.I[start_index:]) / 1000 # Convert mA to A
+            capacitance = I_avg / slope
+            capacitances.append(capacitance)
+
+        return np.array(capacitances)
+            
+    
+    def cycle_capacitances(
+            self, linear_regression: bool = False, window: int = 10,
+            over_last: float = 0.25
+        ) -> np.ndarray:
+        '''
+        This method calculates the capacitance for each charge-discharge cycle.
+        It can either use the instantaneous capacitance method or the linear
+        regression method to calculate the capacitance.
+
+        :param linear_regression: If True, use linear regression to calculate
+            capacitance. If False, use average over instantaneous capacitance.
+        :param window: The window size for calculating instantaneous capacitance
+        :param over_last: The portion of the discharge step to average over,
+            expressed as a fraction of the total discharge step length.
+            For example, 0.25 means the last 25% of the discharge step.
+        :return: Numpy array of capacitances for each charge-discharge cycle.
+        '''
+        if linear_regression:
+            return self.cycle_capacitances_linear_regression(
+                over_last=over_last)
+        else:
+            return self.cycle_capacitances_instantaneous(
+                window=window, over_last=over_last)
 
 
+    def gravimetric_cycle_capacitances(
+            self, linear_regression: bool = False, window: int = 10,
+            over_last: float = 0.25
+        ) -> np.ndarray:
+        '''
+        This method calculates the gravimetric capacitance for each 
+        charge-discharge cycle. It can either use the instantaneous capacitance
+        method or the linear regression method to calculate the capacitance.
 
+        :param linear_regression: If True, use linear regression to calculate
+            capacitance. If False, use average over instantaneous capacitance.
+        :param window: The window size for calculating instantaneous capacitance
+        :param over_last: The portion of the discharge step to average over,
+            expressed as a fraction of the total discharge step length.
+            For example, 0.25 means the last 25% of the discharge step.
+        :return: Numpy array of gravimetric capacitances for each 
+            charge-discharge cycle.
+        '''
+        if self.mass1 == 0.0 and self.mass2 == 0.0:
+            raise ValueError(
+                "Cannot calculate gravimetric capacitance as both masses are "
+                "set to zero. Please set at least one mass to a non-zero "
+                "value."
+            )
+        total_mass = (self.mass1 + self.mass2) / 1000 # Convert mg to g
 
-        
+        if linear_regression:
+            return self.cycle_capacitances_linear_regression(
+                over_last=over_last) * 4 / total_mass
+        else:
+            return self.cycle_capacitances_instantaneous_average(
+                window=window, over_last=over_last) * 4 / total_mass
