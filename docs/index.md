@@ -9,6 +9,6 @@ various experiments which involve electrochemistry
 
 👋 New here? Start with [Getting Started](getting-started.md)
 
-🧠 Know Python? Check the [API Reference](reference/data.md)
+🧠 Know Python? Check the [API Reference](reference/)
 
 🤝 Want to contribute? See [Developer Guide](developer/contributing.md)

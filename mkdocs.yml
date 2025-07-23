@@ -20,6 +20,7 @@ nav:
   - Getting Started: getting-started.md
   - API Reference:
       - Data Class: reference/data.md
+      - SuperCap.GCD Class: reference/SuperCap/GCD.md
   - Developer:
       - Contributing: developer/contributing.md
       - Extending: developer/extending.md
