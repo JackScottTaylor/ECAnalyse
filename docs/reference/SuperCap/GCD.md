@@ -61,7 +61,7 @@ Now try detecting the different current regions using `detect_current_regions(ze
 Hopefully it is clear in the above figure that the regions have been correctly identified. Depending on how accurately your potentiostat can achieve zero-current will determine the threshold you wish to set. In reality you only want to be able to find zero-current regions if you are explicitly including zero-current holds in your charging profiles, otherwise the recommendation is to set the threshold very low so that regions of low current due to voltage holds are not misidentified.
 
 Code to generate above plot:
-```
+```python
 from ECAnalyse.SuperCap.GCD import GCD
 from ECAnalyse.custom_plt import plt, fig_h, fig_w
 gcd = GCD(\path\to\file)
@@ -101,7 +101,7 @@ This method detects regions where the voltage is held constant.
 Below is a GCD which utilises voltage holds. Using `detect_voltage_holds(min_region_length=5, zero_threshold=0.001)` the holds are identified and shown in red in the figure below.
 ![](../SuperCap/GCDFigures/GCDVoltageHolds.png)
 Code to generate above plot:
-```
+```python
 gcd = GCD('path/to/file')
 fig, ax = plt.subplots()
 fig.set_size_inches(fig_w*2, fig_h)
@@ -134,10 +134,80 @@ This method looks at the detected current regions and voltage profile
             the voltage is between -zero_threshold and zero_threshold, then
             it is treated as zero in terms of defining the parity.
 
+#### Example
+We can now look at how charging regions are calculated for a GCD which involves voltage holds and a switching profile. First we can use ECAnalyse to detect the current regions (red if positive, blue if negative) and the voltage hold regions (orange). We can then detect the regions we designate as charging (purple) or discharging (pink).
+![](../SuperCap/GCDFigures/GCDChargingRegions.png)
+Note that in the way we have detected the current regions, they overlap with the voltage holds. However the charging regions explicitly do NOT include the voltage holds. Also note that charging is defined as moving away from zero voltage, hence the splitting of the seemingly single cycle into two separate cycles.
+
+The code to generate the above figure is given here:
+```python
+fig, axs = plt.subplots(2, 1, sharex=True)
+gcd = GCD('/path/to/file')
+gcd.detect_current_regions(zero_threshold=0.01)
+gcd.detect_voltage_hold_regions(zero_threshold=0.001)
+current_colors = {
+    'POSITIVE_CURRENT': 'red',
+    'NEGATIVE_CURRENT': 'blue',
+    'ZERO_CURRENT': 'green',
+}
+for region in gcd.detected_current_regions:
+    color = current_colors[region.parity]
+    start, end = region.start, region.end
+    axs[0].plot(gcd.t[start:end], gcd.E[start:end], color=color)
+
+for region in gcd.detected_voltage_hold_regions:
+    start, end = region.start, region.end
+    axs[0].plot(gcd.t[start:end], gcd.E[start:end], color='orange', linestyle='--')
+
+charging_colors = {
+    'CHARGING': 'purple',
+    'DISCHARGING': 'pink',
+    'ZERO_VOLTAGE': 'green',
+    'ZERO_CURRENT': 'orange'
+}
+gcd.detect_charging_regions(zero_threshold=0.001)
+for region in gcd.detected_charging_regions:
+    start, end = region.start, region.end
+    color = charging_colors[region.parity]
+    axs[1].plot(gcd.t[start:end], gcd.E[start:end], color=color)
+
+axs[0].set_xlim(37000, 45000)
+axs[0].set_ylim(-0.55, 0.55)
+axs[1].set_ylim(-0.55, 0.55)
+axs[0].set_ylabel('Voltage / V')
+axs[1].set_ylabel('Voltage / V')
+axs[1].set_xlabel('Time / s')
+plt.show()
+```
+
 ### detect_charge_discharge_cycles(self)
-This requires that the switch regions have already been detected.
-        A charge-discharge cycle is a charging region followed by a discharging
-        region, possibly with a zero region inbetween.
+This method detects entire charge-discharge cycles. Each cycle must start with a charging region and contain exactly one charging and one discharging region.
+
+#### Example
+Using again some sample GCD data involving voltage holds, we can see what ECAnalyse decides is a single charge-discharge cycle.
+![](../SuperCap/GCDFigures/GCDChargeDischargeCycles.png)
+
+We see that `ECAnalyse` has correctly identified the charge-discharge cycles, and in each cycle a black dot has been added where `ECAnalyse` believes the discharge part of the cycle begins.
+
+Code to produce above figure:
+```python
+fig, ax = plt.subplots()
+fig.set_size_inches(fig_w*2, fig_h)
+gcd = GCD('/path/to/file')
+gcd.detect_current_regions(zero_threshold=0.01)
+gcd.detect_voltage_hold_regions(zero_threshold=0.001)
+gcd.detect_charging_regions(zero_threshold=0.001)
+gcd.detect_charge_discharge_cycles()
+for cycle in gcd.detected_charge_discharge_cycles:
+    start, end = cycle.start, cycle.end
+    discharge_start = cycle.discharging.start
+    ax.plot(gcd.t[start:end], gcd.E[start:end])
+    ax.scatter([gcd.t[discharge_start]], [gcd.E[discharge_start]], color='black')
+ax.set_xlabel('Time / s')
+ax.set_ylabel('Voltage / V')
+ax.set_ylim(-0.55, 0.55)
+plt.show()
+```
 
 ### charge_discharge_cycle_times(self)
 Calculates the charge-discharge cycle times using the detected 
@@ -154,12 +224,99 @@ Calculates the charge-discharge cycle Coulomb efficiencies using the
 
         :return: Numpy array of Coulomb efficiencies for each cycle
 
+#### Theory
+For an ideal supercapacitor, the amount of charge passed during charging, should all be accessible again during the discharge step. The Coulomb efficiency is a measure of how much charge is returned after being used for charging.
+
+The charge passed over a given amount of time, $Q$, is determined from the current using $$Q = \int_\text{start}^\text{end}I dt$$.
+
+When the `Coulomb_efficiencies` method of the GCD class is called, it first calculates the cumulative charge $Q(t)$ if it has not already been calculated using 
+$$Q(t) = \int_0^{T=t}I dT$$
+
+and then calculates from this the absolute value of the charge passed during the charge step of a charge-discharge cycle (all of the cycle before the start of the discharging section) and the charge passed during the discharge section (all of the remaining charge-discharge cycle).
+
+Coulombic efficiency is then calculates as
+$$\text{Efficiency}_\text{Coulomb} = \frac{Q_\text{Discharge}}{Q_\text{Charge}}$$
+
+#### Example
+Using the same sample GCD data as before, we can plot the cumulative charge against time (red when capacitor charging and blue when discharging) and then also plot the Coulomb efficiencies against time.
+![](../SuperCap/GCDFigures/GCDCoulombEfficiency.png)
+
+Code for generating figure:
+```python
+fig, axs = plt.subplots(3, 1, sharex=True)
+fig.set_size_inches(fig_w*2, fig_h*2)
+gcd = GCD('/path/to/file')
+gcd.detect_current_regions(zero_threshold=0.01)
+gcd.detect_voltage_hold_regions(zero_threshold=0.001)
+gcd.detect_charging_regions(zero_threshold=0.001)
+gcd.detect_charge_discharge_cycles()
+gcd.calculate_cumulative_charge()
+Coulom_effs = gcd.Coulomb_efficiencies()
+cycle_times = gcd.charge_discharge_cycle_times()
+
+gcd.plot(ax=axs[0])
+for cycle in gcd.detected_charge_discharge_cycles:
+    start, mid, end = cycle.start, cycle.discharging.start, cycle.end
+    axs[1].plot(gcd.t[start:mid], gcd.Q[start:mid], color='red')
+    axs[1].plot(gcd.t[mid:end], gcd.Q[mid:end], color='blue')
+
+axs[2].plot(cycle_times, Coulom_effs, marker='o', linestyle='--', color='black')
+
+axs[0].set_xlabel('')
+axs[2].set_xlabel('Time / s')
+axs[1].set_ylabel('Charge / C')
+axs[2].set_ylabel('Coulomb Efficiency / %')
+plt.show()
+```
+
 ### energy_efficiencies(self) -> np.ndarray
 Calculates the charge-discharge cycle energy efficiencies using the 
         detected charge-discharge cycles. The energy efficiency is defined as
         discharged energy / charging energy, as a percentage.
 
         :return: Numpy array of energy efficiencies for each cycle
+
+#### Theory
+This is similar to the Coulomb efficiency except instead of keeping track of amount of charge passed during charge and discharge, the energy is accounted for instead. Cumulative energy consumed by the capacitor, $E(t)$, is calculated via the following method:
+$$E(t) = \int_0^{T = t} P dT = \int_0^{T = t} IV dT$$
+
+This can be automatically calculated using the `calculate_cumulative_energy` method of ECLab_File objects (GCD is a child class of ECLab_File). 
+
+Similar to the calculation of Coulomb efficiencies, the efficiency is defined as
+$$\text{Efficiency}_\text{Energy} = \frac{E_\text{Discharge}}{E_\text{Charge}}$$
+
+#### Example
+Repeat essentially the example given for Coulomb efficiencies.
+![](../SuperCap/GCDFigures/GCDEnergyEfficiency.png)
+
+Code to generate figure:
+```python
+fig, axs = plt.subplots(3, 1, sharex=True)
+fig.set_size_inches(fig_w*2, fig_h*2)
+gcd = GCD('path/to/file')
+gcd.detect_current_regions(zero_threshold=0.01)
+gcd.detect_voltage_hold_regions(zero_threshold=0.001)
+gcd.detect_charging_regions(zero_threshold=0.001)
+gcd.detect_charge_discharge_cycles()
+gcd.calculate_cumulative_energy()
+energy_effs = gcd.energy_efficiencies()
+cycle_times = gcd.charge_discharge_cycle_times()
+
+gcd.plot(ax=axs[0])
+for cycle in gcd.detected_charge_discharge_cycles:
+    start, mid, end = cycle.start, cycle.discharging.start, cycle.end
+    axs[1].plot(gcd.t[start:mid], gcd.energy[start:mid], color='red')
+    axs[1].plot(gcd.t[mid:end], gcd.energy[mid:end], color='blue')
+
+axs[2].plot(cycle_times, energy_effs, marker='o', linestyle='--', color='black')
+
+axs[0].set_xlabel('')
+axs[2].set_xlabel('Time / s')
+axs[1].set_ylabel('Energy / Wh')
+axs[2].set_ylabel('Energy Efficiency / %')
+plt.show()
+```
+
 
 ### resistances(self) -> np.ndarray
 Calculates the resistance for each charge-discharge cycle using the 

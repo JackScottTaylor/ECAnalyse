@@ -348,7 +348,7 @@ class ECLab_File(Data):
         # Calculate power as voltage multiplied by current
         self.data['power/W'] = (self.E * self.I) / 1000
         # Set the attribute self.P to the same data
-        self.P = self.data['power/W']
+        self.power = self.data['power/W']
 
 
     def calculate_cumulative_energy(self):
@@ -357,11 +357,11 @@ class ECLab_File(Data):
         power is calculated as voltage multiplied by current. Results stored in 
         self.data['cumulative energy/Wh'] and under the attribute self.energy
         '''
-        if not hasattr(self, 'P'):
+        if not hasattr(self, 'power'):
             self.calculate_power()
         
         self.data['cumulative energy/Wh'] = cumulative_trapezoid(
-            self.P, self.t, initial=0.0) # In joules
+            self.power, self.t, initial=0.0) # In joules
         # Convert to Wh
         self.data['cumulative energy/Wh'] /= 3600
         # Set the attribute self.Energy to the same data
