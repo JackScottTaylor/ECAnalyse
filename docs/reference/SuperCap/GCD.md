@@ -37,45 +37,114 @@ This class provides methods and properties to detect and analyze important regio
 ## Region Detection Methods
 
 ### detect_current_regions(self, zero_threshold: float = 0.1, min_region_length: int = 5)
-- **Description**:
 This method detects regions of the GCD data where the current is either
-positive, negative, or zero. Zero current is defined as being between 
-±zero_threshold and zero_threshold. A region must also contain at least
-min_region_length data points to be considered a valid region. Detected
-regions are accessed via the `detected_regions` property. They are
-stored as a list of tuples in the format: 
-(region_type, start_index, end_index) where region_type is one of
-'POSITVE_CURRENT', 'NEGATIVE_CURRENT', or 'ZERO_CURRENT'.
-The start_index and end_index are the indices of the first and last data
-points in the region, respectively.
-If end_index corresponds to last data point, then it is saved as -1.
+        positive, negative, or zero. Zero current is defined as being between 
+        -zero_threshold and zero_threshold. A region must also contain at least
+        min_region_length data points to be considered a valid region. Detected
+        regions are accessed via the `detected_regions` property. They are
+        stored as a list of tuples in the format: 
+        (region_type, start_index, end_index) where region_type is one of
+        'POSITVE_CURRENT', 'NEGATIVE_CURRENT', or 'ZERO_CURRENT'.
+        The start_index and end_index are the indices of the first and last data
+        points in the region, respectively.
+        If end_index corresponds to last data point, then it is saved as -1.
+    
+        :param zero_threshold: Threshold for defining zero current region
+        :param min_region_length: Minimum length of a region to be considered
+            valid
 
-### detect_charging_regions(self, min_region_length: int = 5, zero_threshold: float = 0.002)
-- **Description**:
-This method looks at the detected current regions and voltage profile
-to determine where the capacitor can be considered to be charging or
-discharging.
-Charging is defined as when the voltage is moving away from zero.
-In this case if current is positive, then if voltage is positive then 
-it is considered charging.
+#### Example
+First look at a GCD which uses short zero-current holds:
+![](../SuperCap/GCDFigures/GCDZeroCurrentPlotCurrentOverlay.png)
+Now try detecting the different current regions using `detect_current_regions(zero_threshold=0.1, min_region_length=10)` and plot the different regions using red to indicate regions of positive current, blue for negative current and green for zero-current.
+![](../SuperCap/GCDFigures/GCDCurrentRegions.png)
+Hopefully it is clear in the above figure that the regions have been correctly identified. Depending on how accurately your potentiostat can achieve zero-current will determine the threshold you wish to set. In reality you only want to be able to find zero-current regions if you are explicitly including zero-current holds in your charging profiles, otherwise the recommendation is to set the threshold very low so that regions of low current due to voltage holds are not misidentified.
+
+Code to generate above plot:
+```
+from ECAnalyse.SuperCap.GCD import GCD
+from ECAnalyse.custom_plt import plt, fig_h, fig_w
+gcd = GCD(\path\to\file)
+def current_regions():
+    fig, ax = plt.subplots()
+    ax2 = ax.twinx()
+    gcd.plot(ax=ax, alpha=0)
+    fig.set_size_inches(fig_w*2, fig_h)
+    gcd.detect_current_regions(zero_threshold=0.1, min_region_length=10)
+    for region in gcd.detected_current_regions:
+        start, end = region.start, region.end
+        colors = {
+            'POSITIVE_CURRENT': 'red',
+            'NEGATIVE_CURRENT': 'blue',
+            'ZERO_CURRENT': 'green'
+        }
+        color = colors[region.parity]
+        ax.plot(gcd.t[start:end], gcd.E[start:end], color=color)
+    gcd.plot_current(ax=ax2, color='mediumslateblue', alpha=0.5)
+    ax.set_xlim(2440, 3130)
+    plt.show()
+```
 
 ### detect_voltage_hold_regions(self, min_region_length: int = 25, zero_threshold: float = 0.001)
-- **Description**:
 This method detects regions where the voltage is held constant.
-This is quite a common addition to GCD experiments and it is
-important to detect these in order to identify cycles correctly.
+        This is quite a common addition to GCD experiments and it is
+        important to detect these in order to identify cycles correctly.
+
+        :param min_region_length: Minimum length of a region to be considered
+            valid. If a region is shorter than this, it will not be included in
+            the detected regions.
+        :param zero_threshold: Threshold for defining a region as a voltage hold.
+            If the voltage change is less than this threshold, then it is
+            considered a voltage hold region.
+
+#### Example
+Below is a GCD which utilises voltage holds. Using `detect_voltage_holds(min_region_length=5, zero_threshold=0.001)` the holds are identified and shown in red in the figure below.
+![](../SuperCap/GCDFigures/GCDVoltageHolds.png)
+Code to generate above plot:
+```
+gcd = GCD('path/to/file')
+fig, ax = plt.subplots()
+fig.set_size_inches(fig_w*2, fig_h)
+ax2 = ax.twinx()
+gcd.plot(ax=ax)
+gcd.plot_current(ax=ax2, color='mediumslateblue', alpha=0.5)
+ax2.yaxis.label.set_color('mediumslateblue')
+ax.set_xlim(38000, 45000)
+
+gcd.detect_voltage_hold_regions(min_region_length=5, zero_threshold=0.001)
+for region in gcd.detected_voltage_hold_regions:
+    start, end = region.start, region.end
+    ax.plot(gcd.t[start:end], gcd.E[start:end], color='red')
+
+plt.show()
+```
+
+### detect_charging_regions(self, min_region_length: int = 5, zero_threshold: float = 0.002)
+This method looks at the detected current regions and voltage profile
+        to determine where the capacitor can be considered to be charging or
+        discharging.
+        Charging is defined as when the voltage is moving away from zero.
+        In this case if current is positive, then if voltage is positive then 
+        it is considered charging.
+
+        :param min_region_length: Minimum length of a region to be considered
+            valid. If a region is shorter than this, it will not be included in
+            the detected regions.
+        :param zero_threshold: Threshold for defining a region as a switch. If
+            the voltage is between -zero_threshold and zero_threshold, then
+            it is treated as zero in terms of defining the parity.
 
 ### detect_charge_discharge_cycles(self)
-- **Description**
 This requires that the switch regions have already been detected.
         A charge-discharge cycle is a charging region followed by a discharging
         region, possibly with a zero region inbetween.
 
 ### charge_discharge_cycle_times(self)
-- **Description**
 Calculates the charge-discharge cycle times using the detected 
         charge-discharge cycles. The cycle time is defined as the time between
         the start of the charging region and the end of the discharging region.
+
+        :return: Numpy array of cycle times for each cycle
 
 ## Analysis Methods
 ### Coulomb_efficiencies(self) -> np.ndarray
@@ -83,10 +152,14 @@ Calculates the charge-discharge cycle Coulomb efficiencies using the
         detected charge-discharge cycles. The Coulomb efficiency is defined as
         discharged charge / charging charge, as a percentage.
 
+        :return: Numpy array of Coulomb efficiencies for each cycle
+
 ### energy_efficiencies(self) -> np.ndarray
 Calculates the charge-discharge cycle energy efficiencies using the 
         detected charge-discharge cycles. The energy efficiency is defined as
         discharged energy / charging energy, as a percentage.
+
+        :return: Numpy array of energy efficiencies for each cycle
 
 ### resistances(self) -> np.ndarray
 Calculates the resistance for each charge-discharge cycle using the 
@@ -94,6 +167,8 @@ Calculates the resistance for each charge-discharge cycle using the
         ΔI is the change in current. Voltage drop calculated as difference
         last voltage in charge region and first voltage in discharge region.
         ΔI is the change in current between the same two points.
+
+        :return: Numpy array of resistances for each cycle in Ohms
 
 ### instantaneous_capacitances(self, window: int = 10) -> List[np.ndarray]
 Calaculates the instantaneous capacitance for each point in the 
