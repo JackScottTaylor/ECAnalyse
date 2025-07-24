@@ -227,15 +227,22 @@ Calculates the charge-discharge cycle Coulomb efficiencies using the
 #### Theory
 For an ideal supercapacitor, the amount of charge passed during charging, should all be accessible again during the discharge step. The Coulomb efficiency is a measure of how much charge is returned after being used for charging.
 
-The charge passed over a given amount of time, $Q$, is determined from the current using $$Q = \int_\text{start}^\text{end}I dt$$.
+The charge passed over a given amount of time, $Q$, is determined from the current using
+```math
+Q = \int_\text{start}^\text{end}I dt
+```
 
 When the `Coulomb_efficiencies` method of the GCD class is called, it first calculates the cumulative charge $Q(t)$ if it has not already been calculated using 
-$$Q(t) = \int_0^{T=t}I dT$$
+```math
+Q(t) = \int_0^{T=t}I dT
+```
 
 and then calculates from this the absolute value of the charge passed during the charge step of a charge-discharge cycle (all of the cycle before the start of the discharging section) and the charge passed during the discharge section (all of the remaining charge-discharge cycle).
 
 Coulombic efficiency is then calculates as
-$$\text{Efficiency}_\text{Coulomb} = \frac{Q_\text{Discharge}}{Q_\text{Charge}}$$
+```math
+\text{Efficiency}_\text{Coulomb} = \frac{Q_\text{Discharge}}{Q_\text{Charge}}
+```
 
 #### Example
 Using the same sample GCD data as before, we can plot the cumulative charge against time (red when capacitor charging and blue when discharging) and then also plot the Coulomb efficiencies against time.
@@ -278,12 +285,16 @@ Calculates the charge-discharge cycle energy efficiencies using the
 
 #### Theory
 This is similar to the Coulomb efficiency except instead of keeping track of amount of charge passed during charge and discharge, the energy is accounted for instead. Cumulative energy consumed by the capacitor, $E(t)$, is calculated via the following method:
-$$E(t) = \int_0^{T = t} P dT = \int_0^{T = t} IV dT$$
+```math
+E(t) = \int_0^{T = t} P dT = \int_0^{T = t} IV dT
+```
 
 This can be automatically calculated using the `calculate_cumulative_energy` method of ECLab_File objects (GCD is a child class of ECLab_File). 
 
 Similar to the calculation of Coulomb efficiencies, the efficiency is defined as
-$$\text{Efficiency}_\text{Energy} = \frac{E_\text{Discharge}}{E_\text{Charge}}$$
+```math
+\text{Efficiency}_\text{Energy} = \frac{E_\text{Discharge}}{E_\text{Charge}}
+```
 
 #### Example
 Repeat essentially the example given for Coulomb efficiencies.
