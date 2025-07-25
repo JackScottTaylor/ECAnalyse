@@ -1,2 +1,3 @@
 # Imports the Data object from the Data module.
 from .Data import Data, TIME_PLACEHOLDER
+from .MetaArray import MetaArray
