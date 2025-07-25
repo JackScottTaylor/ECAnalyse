@@ -175,6 +175,7 @@ class GCD_Plotting_Mixin:
             voltage_hold_regions_min_region_length: int     = 25,
             charging_regions_zero_threshold:        float   = 0.02,
             charging_regions_min_region_length:     int     = 5,
+            over_last:                              float   = 0.25,
             title:                                  str     = '',
             fig_w:                                  float   = 2 * fig_w,
             fig_h:                                  float   = fig_h,
@@ -216,25 +217,35 @@ class GCD_Plotting_Mixin:
         efficiencies        = self.Coulomb_efficiencies()
         energy_efficiencies = self.energy_efficiencies()
         resistances         = self.resistances()
-        capacitances        = self.gravimetric_capacitances()
+        capacitances_avg    = self.gravimetric_cycle_capacitances(
+                                linear_regression=False
+                                )
+        capacitances_lin    = self.gravimetric_cycle_capacitances(
+                                linear_regression=True
+                                )
+        
 
         # Write this data to a .txt file so that it remains accessible
         analysis_txt_filename = os.path.join(analysis_directory,
                                              'GCD_analysis.txt')
         with open(analysis_txt_filename, 'w') as f:
             f.write('Time / s\tCoulomb Efficiency / %\tEnergy Efficiency / %\t'
-                    'Resistance / Ohms\tGravimetric Capacitance / F/g\n')
-            for t, eff, energy_eff, res, cap in zip(
+                    'Resistance / Ohms\tGravimetric Capacitance Average / F/g\t'
+                    'Gravimetric Capacitance Linear Fit / G/g\t'
+                    'Linear Fit Capacitance Error / F/g\t R^2\n')
+            for t, eff, energy_eff, res, cap_avg, cap_lin, cap_err, R2 in zip(
                 times, efficiencies, energy_efficiencies,
-                resistances, capacitances):
+                resistances, capacitances_avg, capacitances_lin,
+                capacitances_lin.errors, capacitances_lin.R2s):
                 f.write(f"{t}\t{eff}\t{energy_eff}\t"
-                        f"{res}\t{cap}\n")
+                        f"{res}\t{cap_avg}\t{cap_lin}\t{cap_err}\t{R2}\n")
                 
         # Create and save a plot which is just the voltage profile
         fig, ax = plt.subplots()
         self.plot(ax=ax, title=title)
         fig.set_size_inches(fig_w, fig_h)
         fig.savefig(os.path.join(analysis_directory, 'GCD.pdf'))
+        fig.clear()
 
         # Create and save a plot which is the voltage profile with current
         # profile overlaid.
@@ -244,6 +255,7 @@ class GCD_Plotting_Mixin:
         self.plot_current(ax=ax2, color='#DC267F', alpha=0.5)
         fig.set_size_inches(fig_w, fig_h)
         fig.savefig(os.path.join(analysis_directory, 'GCD_with_current.pdf'))
+        fig.clear()
                 
         # Make a plot showing all of the charge-discharge cycles.
         fig, ax = plt.subplots()
@@ -256,6 +268,7 @@ class GCD_Plotting_Mixin:
         ax.set_title(title + ' Charge-Discharge Cycles', wrap=True)
         fig.set_size_inches(fig_w, fig_h)
         fig.savefig(os.path.join(analysis_directory, 'GCD_cycles.pdf'))
+        fig.clear()
 
         # Make and save a plot for all of the calculated data fields.
         fig, ax = plt.subplots()
@@ -269,6 +282,7 @@ class GCD_Plotting_Mixin:
         ax.set_title(title + ' Efficiencies', wrap=True)
         fig.set_size_inches(fig_w, fig_h)
         fig.savefig(os.path.join(analysis_directory, 'GCD_efficiencies.pdf'))
+        fig.clear()
 
         # Make and save a plot for the resistances.
         fig, ax = plt.subplots()
@@ -279,18 +293,24 @@ class GCD_Plotting_Mixin:
         ax.set_title(title + ' Resistances', wrap=True)
         fig.set_size_inches(fig_w, fig_h)
         fig.savefig(os.path.join(analysis_directory, 'GCD_resistances.pdf'))
+        fig.clear()
 
         # Make and save a plot for the gravimetric capacitances.
         fig, ax = plt.subplots()
-        ax.plot(times, capacitances, label='Gravimetric Capacitance',
+        ax.plot(times, capacitances_avg, label='Averaging',
                 linestyle='--', marker='o')
+        ax.errorbar(times, capacitances_lin, capacitances_lin.errors,
+                    linestyle='--', label='Linear Fit')
+        ax.legend()
         ax.set_xlabel('Time / s')
         ax.set_ylabel('Gravimetric Capacitance / F/g')
         ax.set_title(title + ' Gravimetric Capacitances', wrap=True)
         fig.set_size_inches(fig_w, fig_h)
         fig.savefig(os.path.join(analysis_directory, 'GCD_capacitances.pdf'))
-
         fig.clear()
+
+        # Make and save a plot to show the linear fits
+        # 
 
         # Now make a figure with all of the data collated together and save it
         ax1 = plt.subplot(411)
@@ -310,10 +330,13 @@ class GCD_Plotting_Mixin:
         ax3.set_ylabel('Resistance / Ohms')
 
         ax4 = plt.subplot(414, sharex=ax1)
-        ax4.plot(times, capacitances, label='Gravimetric Capacitance',
-                 linestyle='--')
-        ax4.set_ylabel('Gravimetric Capacitance / F/g')
+        ax4.plot(times, capacitances_avg, label='Averaging',
+                linestyle='--', marker='o')
+        ax4.errorbar(times, capacitances_lin, yerr=capacitances_lin.errors,
+                    linestyle='--', label='Linear Fit')
+        ax4.legend()
         ax4.set_xlabel('Time / s')
+        ax4.set_ylabel('Gravimetric Capacitance / F/g')
 
         fig = plt.gcf()
         fig.set_size_inches(fig_w, fig_h * 4)

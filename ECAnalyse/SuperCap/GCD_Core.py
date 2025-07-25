@@ -1,6 +1,8 @@
 from __future__ import annotations  # For type hinting self in class methods
 
-from ..File_Types import ECLab_File
+from ..File_Types   import ECLab_File
+from ..Data         import MetaArray
+
 import numpy as np
 import warnings
 
@@ -672,7 +674,7 @@ class GCD(ECLab_File):
         '''
         capacitances = []
         for section in self.detected_charge_discharge_cycles:
-            charging, discharging = section.charging, section.discharging
+            discharging = section.discharging
             d_i1, d_i2 = discharging.start, discharging.end
             if d_i2 == -1: d_i2 = None
 
@@ -761,7 +763,7 @@ class GCD(ECLab_File):
             cycle, calculated as the average of the instantaneous capacitance
             over the last over_last portion of the discharge step.
         '''
-        capacitances = self.gravimetric_instantaneous_capacitances(window)
+        capacitances = self.instantaneous_capacitances(window)
         avg_capacitances = []
         for capacitance in capacitances:
             start = int(len(capacitance) * (1 - over_last))
@@ -780,19 +782,25 @@ class GCD(ECLab_File):
         :param over_last: The portion of the discharge step to average over,
             expressed as a fraction of the total discharge step length.
             For example, 0.25 means the last 25% of the discharge step.
-        :return: Numpy array of average capacitances for each charge-discharge
-            cycle, calculated as the slope of the linear fit to the voltage
-            profile over the last over_last portion of the discharge step.
+        :return: MetaArray with the main array corresponding to the capacitance 
+            of each deteched charge-discharge cycle in Farads. In the metadata 
+            there is attribute `errors` containing the calculated error in each
+            of the calculated capacitances and there is also `R2s` which are the
+            R^2 values of the linear fit for determining the slope.
         '''
-        capacitances = []
+        capacitances        = []
+        capacitance_errors  = []
+        R_squared_vals      = []
+
         for section in self.detected_charge_discharge_cycles:
-            charging, discharging = section.charging, section.discharging
+            discharging = section.discharging
             d_i1, d_i2 = discharging.start, discharging.end
             if d_i2 == -1: d_i2 = None
 
             # Extract the time and voltage for the discharging section
             t = self.t[d_i1:d_i2]
             E = self.E[d_i1:d_i2]
+            I = self.I[d_i1:d_i2] / 1000 # mA to A
 
             # Calculate the start index for the last over_last portion
             start_index = int(len(t) * (1 - over_last))
@@ -800,14 +808,33 @@ class GCD(ECLab_File):
             E_last = E[start_index:]
 
             # Perform linear regression to get the slope (capacitance)
-            slope = linregress(t_last, E_last).slope
+            result      = linregress(t_last, E_last)
+            slope       = result.slope
+            slope_err   = result.stderr
+            R_squared   = result.rvalue ** 2
+            intercept = result.intercept
             
-            # Calculate the capacitance as I / dV/dt
-            I_avg = np.mean(self.I[start_index:]) / 1000 # Convert mA to A
-            capacitance = I_avg / slope
-            capacitances.append(capacitance)
+            # Find the average and standard deviation in the current
+            I_avg = np.mean(I)
+            I_err = np.std(I)
 
-        return np.array(capacitances)
+            capacitance = I_avg / slope
+            I_error_contribution = I_err / slope
+            slope_error_contribuition = (I_avg / (slope ** 2)) * slope_err
+            capacitance_error = np.sqrt(
+                I_error_contribution ** 2 + slope_error_contribuition ** 2
+                )
+            capacitances.append(capacitance)
+            capacitance_errors.append(capacitance_error)
+            R_squared_vals.append(R_squared)
+
+        capacitances        = np.array(capacitances)
+        capacitance_errors  = np.array(capacitance_errors)
+        R_squared_vals      = np.array(R_squared_vals)
+
+        return MetaArray(
+            capacitances, errors=capacitance_errors, R2s=R_squared_vals
+            )
             
     
     def cycle_capacitances(
@@ -862,8 +889,15 @@ class GCD(ECLab_File):
         total_mass = (self.mass1 + self.mass2) / 1000 # Convert mg to g
 
         if linear_regression:
-            return self.cycle_capacitances_linear_regression(
-                over_last=over_last) * 4 / total_mass
+            capacitances = self.cycle_capacitances_linear_regression(
+                                                            over_last=over_last)
+            errors   = capacitances.errors
+            R2s      = capacitances.R2s
+            return MetaArray(
+                capacitances * 4 / total_mass,
+                errors  = errors * 4 / total_mass,
+                R2s     = R2s
+                )
         else:
             return self.cycle_capacitances_instantaneous_average(
                 window=window, over_last=over_last) * 4 / total_mass
