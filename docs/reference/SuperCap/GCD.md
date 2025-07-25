@@ -338,6 +338,58 @@ Calculates the resistance for each charge-discharge cycle using the
 
         :return: Numpy array of resistances for each cycle in Ohms
 
+#### Theory
+The supercapacitor is modelled as an ideal capacitor is series with a resistor. In the GCD experiment a constant current, $I$ is applied through both the capacitor and the resistor. This current results in a voltage across the resistor, $V = IR$. As current continues to flow, a voltage also builds up across the capacitor. The measured Voltage, $V$ is equal to the sum of the Voltages from the capacitor $V_C$ and the resistor $V_R$
+```math
+V(t) = V_C(t) + V_R = \frac{Q_0+It}{C} + IR
+```
+No wimagine a GCD experiment where the capacitor starts completely uncharged ($Q_0=0$) and a constant current of $I_1$ is applied until a Voltage of $V_\text{charged}$ is reached, which we will say happens at time $t_\text{charged}$. We will also assume that the capacitance is constant. Then we can write
+```math
+V_\text{charged} = \frac{I_1 t_\text{charged}}{C} + I_1R
+```
+After reaching the desired voltage, the current is changed such that a constant current of $-I_2$ is now applied. We can write out what the measured voltage will be:
+```math
+V(\Delta t) = \frac{I_1 t_\text{charged} - I_2 \Delta t}{C} - I_2 R
+```
+Now we can consider the drop in measured voltage $\Delta V = V(\Delta t) - V_\text{charged}$. And consider the limit of this values as $\Delta t \rightarrow 0$
+```math
+\lim_{\Delta t \rightarrow 0} \Delta V = -R(I_1 + I_2)
+```
+Therefore by measuring the change in voltage immediately after changing the applied current, the in-series resistance may be measured. A common misconception in measuring the resistance from an Ohmic drop is to only consider the current applied beforehand instead of the change in applied current.
+
+#### Example
+![](../SuperCap/GCDFigures/GCDResistances.png)
+The above figure shows for a sample GCD which points are considered when calculating the resistance. When using the `resistances` method, it iterates through the detected charge-discharge cycles. Identifues which point is the start of the discharge portion and using the point immediately before as the initial voltage and current. 
+
+Code for plot:
+```python
+gcd = GCD('/path/to/file')
+fig, ax = plt.subplots()
+fig.set_size_inches(fig_w*2, fig_h)
+gcd.detect_current_regions(zero_threshold=0.01)
+gcd.detect_voltage_hold_regions(zero_threshold=0.001)
+gcd.detect_charging_regions(zero_threshold=0.001)
+gcd.detect_charge_discharge_cycles()
+
+gcd.plot(ax=ax)
+ax.set_xlim(3700, 3800)
+ax.set_ylim(2.3, 2.6)
+
+for cycle in gcd.detected_charge_discharge_cycles:
+    dstart = cycle.discharging.start
+    cend   = cycle.discharging.start - 1
+    t1, t2, V1, V2 = gcd.t[cend], gcd.t[dstart], gcd.E[cend], gcd.E[dstart]
+    I1, I2 = gcd.I[cend], gcd.I[dstart]
+    ax.scatter(
+        [t1, t2],
+        [V1, V2], color='cornflowerblue', s=100)
+    ax.text(
+        t1+10, V2,
+        f"$\Delta V = $ {V1 - V2:.3f} V\n$\Delta I = $ {I1 - I2:.3f} mA\nR = {(V1-V2)*1000/(I1-I2):.2f} Ohms")
+plt.show()
+```
+
+
 ### instantaneous_capacitances(self, window: int = 10) -> List[np.ndarray]
 Calaculates the instantaneous capacitance for each point in the 
         discharging sections of the GCD experiment.
@@ -352,6 +404,21 @@ Calaculates the instantaneous capacitance for each point in the
         :param window: The window size over which linear regression is applied.
         :return: List of numpy arrays, each corresponding to the instantaneous 
             capacitance for each discharging section of the GCD experiment.
+
+#### Theory
+Start with the general equation reltaing capacitance to stored charge and voltage.
+```math
+Q = CV
+```
+Now take the derivative of the above equation with respect to time assuming that the capacitance is constant.
+```math
+\frac{dQ}{dt} = C\frac{dV}{dt}
+```
+Now note that the time derivative of the stored charge is simply the current so that the following relationship is obtained to describe the capacitance in terms of applied current and rate of change of voltage.
+```math
+C = I \div \frac{dV}{dt}
+```
+Therefore by finding the gradient of the Voltage-time profile, and by knowing the current at all times, the capacitance at every point in the discharge section can be calculated.
 
 ### gravimetric_instantaneous_capacitances(self, window: int = 10) -> List[np.ndarray]
 This method calculates the gravimetric instantaneous capacitance for 
