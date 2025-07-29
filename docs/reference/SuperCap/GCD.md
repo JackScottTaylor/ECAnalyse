@@ -420,6 +420,42 @@ C = I \div \frac{dV}{dt}
 ```
 Therefore by finding the gradient of the Voltage-time profile, and by knowing the current at all times, the capacitance at every point in the discharge section can be calculated.
 
+#### Example
+Here we take some example GCD data and try calculating the instantaneous capacitances using `window=50` but note that the default is `10`.
+![](../SuperCap/GCDFigures/GCDInstantaneousCapacitances.png).
+Note that for all of the cycles the data is quite noisy, despite the relatively large window for calculating over. Also note that over the discharge cycle, the capacitance does change and this is reproducible across the cycles so is in fact a real attribute of the cell. This figure also illustrates the importance of describing which region is considered when reporting a single capacitance value for carbon supercapacitor electrodes. For example in all cycles the capacitance appears to decrease as the cell discharges, therefore the more of the first part of the discharge is considered, the higher a single reported value of capacitance will be.
+
+Code for making the above figure:
+```python
+gcd = GCD('/path/to/file')
+fig, ax = plt.subplots()
+fig.set_size_inches(fig_w*2, fig_h)
+
+gcd.detect_current_regions(zero_threshold=0.01)
+gcd.detect_voltage_hold_regions(zero_threshold=0.001)
+gcd.detect_charging_regions(zero_threshold=0.001)
+gcd.detect_charge_discharge_cycles()
+
+gcd.plot(ax=ax)
+ax.set_ylim(0, 2.6)
+
+ax2 = ax.twinx()
+w = 50
+capacitances = gcd.instantaneous_capacitances(window=w)
+
+for cycle, Cs in zip(gcd.detected_charge_discharge_cycles, capacitances):
+    discharging = cycle.discharging
+    start, end = discharging.start, discharging.end
+    if end == -1: end = None
+
+    # Calculate the times the capacitances correspond to and then plot
+    ts = np.convolve(gcd.t[start:end], np.ones(w)/w, mode='valid')
+    ax2.plot(ts, Cs, alpha=0.75)
+
+ax2.set_ylabel('Capacitance / F')
+plt.show()
+```
+
 ### gravimetric_instantaneous_capacitances(self, window: int = 10) -> List[np.ndarray]
 This method calculates the gravimetric instantaneous capacitance for 
         each discharging section of the GCD experiment.
@@ -435,10 +471,63 @@ This method calculates the gravimetric instantaneous capacitance for
             instantaneous capacitance for each discharging section of the GCD
             experiment. 
 
+#### Theory
+When calculating the gravimetric capacitance the view is taken that the supercapacitor consists of two double-layer capacitors in series with eachother. Therefore if we suppose that the capacitance of the two double-layer capacitors are $C_1$ and $C_2$ then the total capacitance of the cell, $C_T$ is given by
+```math
+\frac{1}{C_T} = \frac{1}{C_1} + \frac{1}{C_2}
+```
+The next assumption that is made is that the two double-layer capacitances are equal and we can therefore refer to a double-layer capacitance such that 
+```math
+C_T = \frac{C_{DL}}{2}
+```
+We then make a further assumption that the two electrode masses are roughly equal and that we can use the average value as the mass of an electrode
+```math
+m = \frac{m_1 + m_2}{2}
+```
+Finally, the gravimetric capacitance is calculated as the double-layer capacitance divided by the average electrode mass
+```math
+C_\text{grav} = \frac{C_\text{DL}}{m} = 4 \times\frac{C_T}{m_1 + m_2}
+```
+Therefore this method uses `instantaneous_capacitances` to calculate the total cell capacitance at each timepoint of the discharge section, then divides by the total electrode mass and multiplies by four to return the instantaneous gravimetric capacitances.
+
+#### Example
+Using the same example as for `instantaneous_capacitances` but calculating the gravimetric version.
+![](../SuperCap/GCDFigures/GCDGravInstantaneousCapacitances.png)
+Code for figure:
+```python
+gcd = GCD('/path/to/file', mass1=3.3, mass2=3.1)
+fig, ax = plt.subplots()
+fig.set_size_inches(fig_w*2, fig_h)
+
+gcd.detect_current_regions(zero_threshold=0.01)
+gcd.detect_voltage_hold_regions(zero_threshold=0.001)
+gcd.detect_charging_regions(zero_threshold=0.001)
+gcd.detect_charge_discharge_cycles()
+
+gcd.plot(ax=ax)
+ax.set_ylim(0, 2.6)
+
+ax2 = ax.twinx()
+w = 50
+capacitances = gcd.gravimetric_instantaneous_capacitances(window=w)
+
+for cycle, Cs in zip(gcd.detected_charge_discharge_cycles, capacitances):
+    discharging = cycle.discharging
+    start, end = discharging.start, discharging.end
+    if end == -1: end = None
+
+    # Calculate the times the capacitances correspond to and then plot
+    ts = np.convolve(gcd.t[start:end], np.ones(w)/w, mode='valid')
+    ax2.plot(ts, Cs, alpha=0.75)
+
+ax2.set_ylabel('Capacitance / Fg$^{-1}$')
+plt.show()
+```
+
 ### cycle_capacitances_instantaneous_average(self, window: int = 10, over_last: float = 0.25) -> np.ndarray
 This method calculates the capacitance for each charge-discharge cycle
         by taking the average of the instantaneous capacitance over the last
-        over_last portion of the discharge step.
+        `over_last` portion of the discharge step.
 
         :param window: The window size over which linear regression is applied 
             to calculate the instantaneous capacitance.
@@ -449,18 +538,91 @@ This method calculates the capacitance for each charge-discharge cycle
             cycle, calculated as the average of the instantaneous capacitance
             over the last over_last portion of the discharge step.
 
+#### Theory
+This method uses the instantaneous values calculated using `instantaneous_capacitances` and then takes an average of those values from a chosen start to the end of the discharge region. As shown in previous examples, assuming that the capacitance does not change over the voltage window is not always accurate to reality and therefore it should always be reported over which region you are averaging.
+
+#### Example
+Here we take the same sample data as used in the previous examples and find the cycle capacitances, calculated over various amount of the discharge section.
+![](../SuperCap/GCDFigures/GCDAveragedCapacitances.png)
+As expected from how the instantaneous capacitances look, the more of the discharge section we use, the higher the average capacitance. Again this is a key example of why it is important to consider which section it makes most sense to average over when reporting these values.
+
+Code for the figure:
+```python
+gcd = GCD('/path/to/file')
+fig, axs = plt.subplots(2, sharex=True)
+ax, ax3 = axs
+ax2 = ax.twinx()
+fig.set_size_inches(fig_w*2, 1.2*fig_h)
+
+gcd.detect_current_regions(zero_threshold=0.01)
+gcd.detect_voltage_hold_regions(zero_threshold=0.001)
+gcd.detect_charging_regions(zero_threshold=0.001)
+gcd.detect_charge_discharge_cycles()
+
+gcd.plot(ax=ax)
+ax.set_ylim(0, 2.6)
+
+w = 50
+capacitances = gcd.instantaneous_capacitances(window=w)
+
+for cycle, Cs in zip(gcd.detected_charge_discharge_cycles, capacitances):
+    discharging = cycle.discharging
+    start, end = discharging.start, discharging.end
+    if end == -1: end = None
+
+    # Calculate the times the capacitances correspond to and then plot
+    ts = np.convolve(gcd.t[start:end], np.ones(w)/w, mode='valid')
+    ax2.plot(ts, Cs, alpha=0.75)
+
+ax2.set_ylabel('Capacitance / F')
+
+cycle_times = gcd.charge_discharge_cycle_times()
+for over_last in [0.1, 0.25, 0.5, 0.75, 1.0]:
+    capacitances = gcd.cycle_capacitances_instantaneous_average(
+        window = w, over_last = over_last
+    )
+    ax3.plot(cycle_times, capacitances, label=f'{over_last}')
+
+ax.set_xlabel('')
+ax3.set_xlabel('Time / s')
+ax3.set_ylabel('Capacitance / F')
+ax3.legend()
+plt.show()
+```
+
 ### cycle_capacitances_linear_regression(self, over_last: float = 0.25) -> np.ndarray
 This method calculates the capacitance for each charge-discharge cycle
         by performing linear regression on the voltage profile over the last
         over_last portion of the discharge step. The capacitance is calculated
-        as the slope of the linear fit to the voltage profile.
+        as the slope of the linear fit to the voltage profile. Also calculated
+        are the errors in the capacitance and the R^2 values.
 
         :param over_last: The portion of the discharge step to average over,
             expressed as a fraction of the total discharge step length.
             For example, 0.25 means the last 25% of the discharge step.
-        :return: Numpy array of average capacitances for each charge-discharge
-            cycle, calculated as the slope of the linear fit to the voltage
-            profile over the last over_last portion of the discharge step.
+        :return: MetaArray with the main array corresponding to the capacitance 
+            of each deteched charge-discharge cycle in Farads. In the metadata 
+            there is attribute `errors` containing the calculated error in each
+            of the calculated capacitances and there is also `R2s` which are the
+            R^2 values of the linear fit for determining the slope.
+
+#### Theory
+The method of converting current and rate of change in Voltage to a value of capacitance is covered already in the documentation for the `instantaneous _capacitances` method above. Here we will describe the theory behind how the errors are calculated.
+
+First start with the relationship between capacitance, current and change in voltage:
+```math
+C = I \div \frac{dV}{dt} = \frac{I}{y}
+```
+where we replace the rate of change of Voltage with the variable $y$. Now perform partial
+differentiation with respect $I$ and $y$.
+```math
+\partial C = \frac{1}{y}\partial I - \frac{I}{y^2}\partial y
+```
+From this equation and assuming that errors in $I$ and $y$ follow Gaussian distributions, then from the above partial differential, the standard error for $C$, $\Delta C$, is calculated according to the following equation.
+```math
+\Delta C = \sqrt{\left( \frac{\Delta I}{y} \right)^2 + \left( \frac{I \Delta y}{y^2}\right)^2}
+```
+In this function, the values of $\Delta I$ and $\Delta y$ are calculated as the standard deviation of these values over the data considered. The values of $I$ and $y$ are taken as the mean values over the same data.
 
 ### cycle_capacitances(self, linear_regression: bool = False, window: int = 10, over_last: float = 0.25) -> np.ndarray
 This method calculates the capacitance for each charge-discharge cycle.

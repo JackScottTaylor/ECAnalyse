@@ -704,13 +704,15 @@ class GCD(ECLab_File):
 
             # Shorten the current array to match the dVdt length, correctly
             # removing from both ends by taking rolling average over the window
+            # also calculate the times to match the instantaneous capacitances
             I = np.convolve(I, np.ones(window)/window, mode='valid')
 
             # Calculate the instantaneous capacitance
             I = I / 1000 # Convert from mA to A
             C = I / dVdt
-            # Append to the list
+            # Append to the lists
             capacitances.append(C)
+
         return capacitances
         
     
@@ -731,7 +733,7 @@ class GCD(ECLab_File):
             instantaneous capacitance for each discharging section of the GCD
             experiment. 
         '''
-        capacitances = self.instantaneous_capacitances()
+        capacitances = self.instantaneous_capacitances(window=window)
         if self.mass1 == 0.0 and self.mass2 == 0.0:
             raise ValueError(
                 "Cannot calculate gravimetric capacitance as both masses are "
@@ -772,12 +774,13 @@ class GCD(ECLab_File):
     
 
     def cycle_capacitances_linear_regression(
-            self, over_last: float = 0.25) -> np.ndarray:
+            self, over_last: float = 0.25) -> MetaArray:
         '''
         This method calculates the capacitance for each charge-discharge cycle
         by performing linear regression on the voltage profile over the last
         over_last portion of the discharge step. The capacitance is calculated
-        as the slope of the linear fit to the voltage profile.
+        as the slope of the linear fit to the voltage profile. Also calculated
+        are the errors in the capacitance and the R^2 values.
 
         :param over_last: The portion of the discharge step to average over,
             expressed as a fraction of the total discharge step length.
@@ -812,12 +815,13 @@ class GCD(ECLab_File):
             slope       = result.slope
             slope_err   = result.stderr
             R_squared   = result.rvalue ** 2
-            intercept = result.intercept
+            intercept   = result.intercept
             
             # Find the average and standard deviation in the current
             I_avg = np.mean(I)
             I_err = np.std(I)
 
+            # Calculate the capacitance and associated errors
             capacitance = I_avg / slope
             I_error_contribution = I_err / slope
             slope_error_contribuition = (I_avg / (slope ** 2)) * slope_err
